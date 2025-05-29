@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -28,9 +29,12 @@ import type { Quotation, QuotationStatus, ScheduleRate, Port } from '@/lib/types
 import { DataTable, ColumnDef } from '@/components/common/DataTable';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Search, XCircle } from 'lucide-react';
+import { Loader2, Search, XCircle, Wand2 } from 'lucide-react'; // Added Wand2
 import { useData } from '@/contexts/DataContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { generateQuotationSummary, type GenerateQuotationSummaryInput } from '@/ai/flows/generate-quotation-summary-flow';
+import { useToast } from '@/hooks/use-toast';
+
 
 const quotationFormSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
@@ -63,9 +67,11 @@ const quotationStatuses: QuotationStatus[] = ['Draft', 'Submitted', 'Booking Com
 
 export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }: QuotationFormProps) {
   const { ports, searchScheduleRates, loading: dataLoading } = useData();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = React.useState('step1');
   const [availableRates, setAvailableRates] = React.useState<ScheduleRate[]>([]);
   const [ratesLoading, setRatesLoading] = React.useState(false);
+  const [isAiGenerating, setIsAiGenerating] = React.useState(false);
 
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationFormSchema),
@@ -178,6 +184,47 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
     }
   ];
 
+  const handleGenerateSummary = async () => {
+    const values = form.getValues();
+    const requiredFields: (keyof QuotationFormValues)[] = ['customerName', 'pol', 'pod', 'equipment', 'volume', 'type'];
+    const missingFields = requiredFields.filter(field => !values[field]);
+
+    if (missingFields.length > 0) {
+        toast({
+            title: "Missing Information",
+            description: `Please fill in ${missingFields.join(', ')} before generating summary.`,
+            variant: "default"
+        });
+        return;
+    }
+
+    setIsAiGenerating(true);
+    try {
+        const input: GenerateQuotationSummaryInput = {
+            customerName: values.customerName!,
+            pol: values.pol!,
+            pod: values.pod!,
+            equipment: values.equipment!,
+            volume: values.volume!,
+            type: values.type!,
+        };
+        const result = await generateQuotationSummary(input);
+        form.setValue('notes', result.summary);
+        toast({
+            title: "AI Summary Generated",
+            description: "The notes field has been populated."
+        });
+    } catch (error) {
+        console.error("AI Summary generation failed:", error);
+        toast({
+            title: "AI Error",
+            description: "Failed to generate summary. Please try again or enter manually.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsAiGenerating(false);
+    }
+  };
 
   const renderStep1 = () => (
     <div className="space-y-4">
@@ -283,7 +330,20 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
       )}
        <FormField control={form.control} name="notes" render={({ field }) => (
         <FormItem>
-          <FormLabel>Notes</FormLabel>
+          <div className="flex items-center justify-between">
+            <FormLabel>Notes</FormLabel>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGenerateSummary} 
+              disabled={isAiGenerating || isSubmitting || dataLoading || ratesLoading}
+              className="ml-2"
+            >
+              {isAiGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+              Generate with AI
+            </Button>
+          </div>
           <FormControl><Textarea placeholder="Internal notes or comments for this quotation..." {...field} /></FormControl>
           <FormMessage />
         </FormItem>
@@ -346,7 +406,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
         </Accordion>
 
         <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting || isAiGenerating}>
             Cancel
           </Button>
           {currentStep !== "step3" && (
@@ -364,12 +424,14 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
                     else if (currentStep === 'step2' && (!form.getValues('buyRate') || !form.getValues('sellRate'))) setCurrentStep('step2');
                 }
               });
-            }}>
+            }}
+            disabled={isAiGenerating}
+            >
               Next
             </Button>
           )}
           {currentStep === "step3" && (
-            <Button type="submit" disabled={isSubmitting || initialData?.status === 'Booking Completed'}>
+            <Button type="submit" disabled={isSubmitting || initialData?.status === 'Booking Completed' || isAiGenerating}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (initialData ? 'Update Quotation' : 'Submit Quotation')}
             </Button>
           )}
@@ -378,3 +440,4 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
     </Form>
   );
 }
+
