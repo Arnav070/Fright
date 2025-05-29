@@ -1,3 +1,5 @@
+
+import * as React from 'react'; // Ensure React is imported if it's used for types like ReactNode
 import type { ReactNode } from 'react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
