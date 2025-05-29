@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -10,6 +11,7 @@ import { useData } from '@/contexts/DataContext';
 import { getBookingColumns } from './columns';
 import { PlusCircle, Edit, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export default function BookingsPage() {
   const router = useRouter();
