@@ -96,6 +96,8 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
       type: 'Export',
       status: 'Draft',
       notes: '',
+      buyRate: undefined, // Explicitly set to undefined for new forms
+      sellRate: undefined, // Explicitly set to undefined for new forms
     },
   });
 
@@ -105,8 +107,15 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
   React.useEffect(() => {
     if (selectedRate) {
       form.setValue('buyRate', selectedRate.buyRate);
-      // Optionally auto-calculate sellRate or leave it for manual input
-      // form.setValue('sellRate', selectedRate.buyRate * 1.1); // e.g. 10% markup
+      // If sellRate was undefined, and we select a rate, we might want to clear it or pre-fill it.
+      // For now, it's left to be manually entered or potentially pre-filled.
+      // If form.getValues('sellRate') is undefined, it will remain so unless user types or another logic sets it.
+    } else {
+      // If a rate is deselected, the user might want to input manually
+      // or the fields should clear. Currently, they retain old values.
+      // Consider clearing if that's the desired UX:
+      // form.setValue('buyRate', undefined);
+      // form.setValue('sellRate', undefined);
     }
   }, [selectedRate, form]);
 
@@ -132,6 +141,8 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             form.setValue('selectedRateId', checked ? row.original.id : undefined, { shouldValidate: true });
             if (checked) {
               form.setValue('buyRate', row.original.buyRate);
+              // Potentially clear or prefill sellRate here too
+              // form.setValue('sellRate', undefined); // Example: clear sell rate to force re-entry
             } else {
               form.setValue('buyRate', undefined);
               form.setValue('sellRate', undefined);
@@ -159,8 +170,9 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
                 <Input 
                   type="number"
                   step="0.01"
-                  {...field} 
-                  onChange={e => field.onChange(parseFloat(e.target.value))}
+                  {...field}
+                  value={field.value ?? ''} // Ensure controlled input
+                  onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                   className="h-8 w-24"
                   placeholder="Sell Rate"
                 />
@@ -175,7 +187,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
         cell: ({ row }) => {
             const isSelected = row.original.id === selectedRateId;
             const sellRateValue = form.watch('sellRate');
-            if (isSelected && sellRateValue && row.original.buyRate) {
+            if (isSelected && typeof sellRateValue === 'number' && typeof row.original.buyRate === 'number') {
                 const margin = sellRateValue - row.original.buyRate;
                 return <span className={margin >= 0 ? 'text-green-600' : 'text-red-600'}>${margin.toFixed(2)}</span>;
             }
@@ -308,12 +320,19 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             </Button>
         </div>
       <DataTable columns={rateTableColumns} data={availableRates} isLoading={ratesLoading} pageSize={5} />
-      {!selectedRateId && !form.getValues('buyRate') && (
+      {!selectedRateId && (form.getValues('buyRate') === undefined || form.getValues('sellRate') === undefined) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border-t pt-4">
               <FormField control={form.control} name="buyRate" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Manual Buy Rate</FormLabel>
-                      <FormControl><Input type="number" step="0.01" placeholder="Enter Buy Rate" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl>
+                      <FormControl><Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="Enter Buy Rate" 
+                        {...field} 
+                        value={field.value ?? ''} // Ensure controlled
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                      /></FormControl>
                       <FormDescription>Enter if no rate selected or for custom rate.</FormDescription>
                       <FormMessage />
                   </FormItem>
@@ -321,7 +340,14 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
               <FormField control={form.control} name="sellRate" render={({ field }) => (
                   <FormItem>
                       <FormLabel>Manual Sell Rate</FormLabel>
-                      <FormControl><Input type="number" step="0.01" placeholder="Enter Sell Rate" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl>
+                      <FormControl><Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="Enter Sell Rate" 
+                        {...field} 
+                        value={field.value ?? ''} // Ensure controlled
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                      /></FormControl>
                       <FormDescription>Enter if no rate selected or for custom rate.</FormDescription>
                       <FormMessage />
                   </FormItem>
@@ -353,7 +379,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
 
   const renderStep3 = () => {
     const values = form.getValues();
-    const calculatedMargin = values.sellRate && values.buyRate ? values.sellRate - values.buyRate : 0;
+    const calculatedMargin = (typeof values.sellRate === 'number' && typeof values.buyRate === 'number') ? values.sellRate - values.buyRate : 0;
     return (
         <Card>
             <CardHeader><CardTitle>Review Quotation Details</CardTitle></CardHeader>
@@ -368,8 +394,8 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
                         <p><strong>Voyage:</strong> {selectedRate.voyageDetails}</p>
                     </>
                 )}
-                <p><strong>Buy Rate:</strong> ${values.buyRate?.toFixed(2) || 'N/A'}</p>
-                <p><strong>Sell Rate:</strong> ${values.sellRate?.toFixed(2) || 'N/A'}</p>
+                <p><strong>Buy Rate:</strong> ${typeof values.buyRate === 'number' ? values.buyRate.toFixed(2) : 'N/A'}</p>
+                <p><strong>Sell Rate:</strong> ${typeof values.sellRate === 'number' ? values.sellRate.toFixed(2) : 'N/A'}</p>
                 <p><strong>Estimated Margin:</strong> <span className={calculatedMargin >= 0 ? 'text-green-600' : 'text-red-600'}>${calculatedMargin.toFixed(2)}</span></p>
                 {values.notes && <p><strong>Notes:</strong> {values.notes}</p>}
             </CardContent>
@@ -378,10 +404,19 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
   };
   
   const handleFormSubmit = async (data: QuotationFormValues) => {
-    if (!data.buyRate || !data.sellRate) {
-        form.setError("buyRate", {type: "manual", message: "Buy rate is required if no rate is selected."});
-        form.setError("sellRate", {type: "manual", message: "Sell rate is required if no rate is selected."});
-        setCurrentStep("step2"); // Go back to step 2
+    // Ensure buyRate and sellRate are set if they are required by logic (e.g. status is not Draft)
+    // The Zod schema's .optional() means they can be undefined.
+    // Validation for positive numbers will only run if they are not undefined.
+    // The submit button logic might need to ensure these are present before final submission based on status.
+    if (data.status !== 'Draft' && (data.buyRate === undefined || data.sellRate === undefined)) {
+        toast({
+            title: "Missing Rates",
+            description: "Buy Rate and Sell Rate are required for non-draft quotations.",
+            variant: "destructive"
+        });
+        setCurrentStep("step2"); // Go back to step 2 to enter rates
+        form.setError("buyRate", {type: "manual", message: "Buy rate is required."});
+        form.setError("sellRate", {type: "manual", message: "Sell rate is required."});
         return;
     }
     await onSubmit(data);
@@ -413,15 +448,21 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             <Button type="button" onClick={() => {
               const steps = ["step1", "step2", "step3"];
               const currentIndex = steps.indexOf(currentStep);
-              // Trigger validation before moving to next step
-              form.trigger(Object.keys(form.getValues()) as any).then(isValid => {
+              // Trigger validation before moving to next step for current step's fields
+              let fieldsToValidate: (keyof QuotationFormValues)[] = [];
+              if (currentStep === "step1") {
+                fieldsToValidate = ["customerName", "pol", "pod", "equipment", "volume", "type", "status"];
+              } else if (currentStep === "step2") {
+                 // For step 2, validation of buyRate/sellRate might be conditional
+                 // For now, we let Zod handle it on submit or via the manual submit check
+              }
+
+              form.trigger(fieldsToValidate.length > 0 ? fieldsToValidate : undefined).then(isValid => {
                 if(isValid) {
                     if (currentIndex < steps.length - 1) setCurrentStep(steps[currentIndex + 1]);
                 } else {
-                    // If not valid, and current step is step1, stay on step1.
-                    // If current step is step2, and rate info is missing, stay on step2.
-                    if (currentStep === 'step1') setCurrentStep('step1');
-                    else if (currentStep === 'step2' && (!form.getValues('buyRate') || !form.getValues('sellRate'))) setCurrentStep('step2');
+                    // Stay on current step if validation fails
+                    toast({ title: "Validation Error", description: "Please correct the errors before proceeding.", variant: "destructive"});
                 }
               });
             }}
