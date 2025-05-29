@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
@@ -34,6 +35,7 @@ import {
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Logo } from '@/components/common/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import type { User } from '@/lib/types'; // Import User type
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -78,7 +80,6 @@ function NavLink({ item, currentPathname }: { item: NavItem; currentPathname: st
           >
             <item.icon className="h-4 w-4 shrink-0" />
             {(open || isMobile) && <span className="truncate flex-1">{item.label}</span>}
-            {/* Chevron is part of AccordionTrigger by default if content is present */}
           </AccordionTrigger>
           <AccordionContent className={cn("pl-4 pr-0 py-0", (open || isMobile) ? "block" : "hidden")}>
             <SidebarMenu className="border-l border-sidebar-border ml-2 pl-2">
@@ -121,23 +122,9 @@ function NavLink({ item, currentPathname }: { item: NavItem; currentPathname: st
   );
 }
 
-
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+function AppLayoutInternal({ children, user }: { children: React.ReactNode; user: User }) {
   const pathname = usePathname();
-  const { open: sidebarOpen } = useSidebar(); // Get sidebar state
-
-  React.useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
-  }, [user, loading, router]);
-
-  if (loading || !user) {
-    // You can show a global loader here if needed
-    return <div className="flex h-screen items-center justify-center">Loading application...</div>;
-  }
+  const { open, isMobile } = useSidebar(); // Correctly called within SidebarProvider's context
 
   const filteredNavItems = navItems.filter(item => 
     item.roles ? item.roles.includes(user.role) : true
@@ -147,15 +134,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }));
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <>
       <Sidebar collapsible="icon" className="border-r">
         <SidebarHeader className="p-3">
-           <Logo size="md" iconOnly={!sidebarOpen} showText={sidebarOpen} />
+           <Logo size="md" iconOnly={!open && !isMobile} showText={open || isMobile} />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
             {filteredNavItems.map((item) => (
-              item.children && item.children.length === 0 ? null : // Hide admin group if no children visible
+              item.children && item.children.length === 0 ? null :
               <SidebarMenuItem key={item.href}>
                 <NavLink item={item} currentPathname={pathname} />
               </SidebarMenuItem>
@@ -163,8 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
          <SidebarFooter className="p-3">
-          {/* Quick actions if sidebar is open */}
-          {sidebarOpen && (
+          {(open || isMobile) && (
             <div className="space-y-2">
                <Button variant="outline" size="sm" className="w-full justify-start gap-2" asChild>
                 <Link href="/quotations/new"><PackagePlus className="h-4 w-4" /> New Quotation</Link>
@@ -182,6 +168,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </SidebarInset>
+    </>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div className="flex h-screen items-center justify-center">Loading application...</div>;
+  }
+
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <AppLayoutInternal user={user}>
+        {children}
+      </AppLayoutInternal>
     </SidebarProvider>
   );
 }
