@@ -1,3 +1,4 @@
+
 import type { User, UserRole, Quotation, QuotationStatus, Booking, BuyRate, Schedule, Port, ScheduleRate } from './types';
 import { format } from 'date-fns';
 
@@ -141,29 +142,6 @@ export const mockScheduleRates: ScheduleRate[] = Array.from({ length: 30 }, (_, 
     allocation: Math.floor(Math.random() * 20) + 5,
   };
 });
-
-// For dashboard charts
-export const mockQuotationStatusSummary = {
-  draft: initialMockQuotations.filter(q => q.status === 'Draft').length,
-  submitted: initialMockQuotations.filter(q => q.status === 'Submitted').length,
-  completed: initialMockQuotations.filter(q => q.status === 'Booking Completed').length,
-};
-
-export const mockBookingsByMonth = (() => {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const currentMonth = today.getMonth();
-  const result: { month: string; count: number }[] = [];
-  for (let i = 5; i >= 0; i--) { // Last 6 months
-    const monthIdx = (currentMonth - i + 12) % 12;
-    result.push({
-      month: months[monthIdx],
-      // Simplified: distribute bookings somewhat evenly for demo
-      count: Math.floor(initialMockBookings.length / 6) + Math.floor(Math.random() * 5 - 2) 
-    });
-  }
-  // Ensure counts are not negative
-  return result.map(item => ({...item, count: Math.max(0, item.count)}));
-})();
 
 // Helper to simulate API delay
 export const simulateDelay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms));

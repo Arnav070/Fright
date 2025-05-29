@@ -1,8 +1,18 @@
+
 "use client";
 
 import type { ReactNode} from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Quotation, Booking, BuyRate, Schedule, ScheduleRate, Port } from '@/lib/types';
+import type { 
+  Quotation, 
+  Booking, 
+  BuyRate, 
+  Schedule, 
+  ScheduleRate, 
+  Port,
+  QuotationStatusSummary,
+  BookingsByMonthEntry
+} from '@/lib/types';
 import { 
   initialMockQuotations, 
   initialMockBookings, 
@@ -12,7 +22,7 @@ import {
   mockPorts,
   simulateDelay
 } from '@/lib/mockData';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface DataContextType {
   ports: Port[];
@@ -22,6 +32,11 @@ interface DataContextType {
   schedules: Schedule[];
   scheduleRates: ScheduleRate[];
   loading: boolean;
+
+  // Dashboard specific data
+  quotationStatusSummary: QuotationStatusSummary;
+  bookingsByMonth: BookingsByMonthEntry[];
+
   fetchQuotations: (page: number, pageSize: number) => Promise<{ data: Quotation[], total: number }>;
   getQuotationById: (id: string) => Promise<Quotation | undefined>;
   createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => Promise<Quotation>;
@@ -58,7 +73,62 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(mockScheduleRates);
   const [loading, setLoading] = useState(false); // For individual operations
 
+  const [quotationStatusSummary, setQuotationStatusSummary] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
+  const [bookingsByMonth, setBookingsByMonth] = useState<BookingsByMonthEntry[]>([]);
+
   const now = () => format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+
+  // Recalculate quotation status summary when quotations change
+  useEffect(() => {
+    const summary: QuotationStatusSummary = { draft: 0, submitted: 0, completed: 0, cancelled: 0 };
+    quotations.forEach(q => {
+      if (q.status === 'Draft') summary.draft++;
+      else if (q.status === 'Submitted') summary.submitted++;
+      else if (q.status === 'Booking Completed') summary.completed++;
+      else if (q.status === 'Cancelled') summary.cancelled++;
+    });
+    setQuotationStatusSummary(summary);
+  }, [quotations]);
+
+  // Recalculate bookings by month when bookings change
+  useEffect(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const countsByMonth: { [key: string]: number } = {};
+    
+    const today = new Date();
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1); // Start of the 6-month window (e.g. if June, starts Jan)
+
+    bookings.forEach(b => {
+      // Ensure createdAt is a string before parsing. If it's already a Date object, handle appropriately.
+      // Mock data uses 'yyyy-MM-dd HH:mm:ss' which might not be directly parseable by new Date() consistently across browsers.
+      // It's safer to parse it manually or use date-fns.parse if the format is fixed.
+      // For simplicity here, assuming `b.createdAt` string is reliably parseable to a Date.
+      // A more robust way: const bookingDate = parseISO(b.createdAt.replace(' ', 'T')); // if ISO-like
+      const [datePart] = b.createdAt.split(' ');
+      const [year, month, day] = datePart.split('-').map(Number);
+      // JavaScript months are 0-indexed, so month - 1
+      const bookingDate = new Date(year, month - 1, day);
+
+
+      if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
+          const monthName = monthNames[bookingDate.getMonth()];
+          countsByMonth[monthName] = (countsByMonth[monthName] || 0) + 1;
+      }
+    });
+
+    const result: BookingsByMonthEntry[] = [];
+    const currentMonthIndex = today.getMonth();
+    for (let i = 5; i >= 0; i--) { // Iterate for the last 6 months including current
+      const monthIdx = (currentMonthIndex - i + 12) % 12;
+      const monthName = monthNames[monthIdx];
+      result.push({
+        month: monthName,
+        count: countsByMonth[monthName] || 0
+      });
+    }
+    setBookingsByMonth(result);
+  }, [bookings]);
+
 
   // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number) => {
@@ -84,11 +154,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const newQuotation: Quotation = {
       ...quotationData,
       id: `QTN-${String(Date.now()).slice(-6)}`,
-      profitAndLoss: quotationData.sellRate - quotationData.buyRate,
+      profitAndLoss: (quotationData.sellRate || 0) - (quotationData.buyRate || 0),
       createdAt: now(),
       updatedAt: now(),
     };
-    setQuotations(prev => [newQuotation, ...prev]);
+    setQuotations(prev => [newQuotation, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
     return newQuotation;
   }, []);
@@ -99,16 +169,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let updatedQuotation: Quotation | undefined;
     setQuotations(prev => prev.map(q => {
       if (q.id === id) {
+        const currentBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : q.buyRate;
+        const currentSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : q.sellRate;
         updatedQuotation = { 
             ...q, 
             ...quotationData, 
             updatedAt: now(),
-            profitAndLoss: (quotationData.sellRate !== undefined && quotationData.buyRate !== undefined) ? quotationData.sellRate - quotationData.buyRate : q.profitAndLoss,
+            profitAndLoss: (currentSellRate || 0) - (currentBuyRate || 0),
         };
         return updatedQuotation;
       }
       return q;
-    }));
+    }).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
     return updatedQuotation;
   }, []);
@@ -138,7 +210,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return results;
   }, [quotations]);
 
-  // Booking Operations (Simplified - implement similarly to Quotations)
+  // Booking Operations
   const fetchBookings = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
     await simulateDelay();
@@ -165,7 +237,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createdAt: now(),
       updatedAt: now(),
     };
-    setBookings(prev => [newBooking, ...prev]);
+    setBookings(prev => [newBooking, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
     return newBooking;
   }, []);
@@ -180,7 +252,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return updatedBooking;
       }
       return b;
-    }));
+    }).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
     return updatedBooking;
   }, []);
@@ -200,7 +272,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     await simulateDelay();
     const newBuyRate: BuyRate = { ...data, id: `BR-${String(Date.now()).slice(-6)}` };
-    setBuyRates(prev => [newBuyRate, ...prev]);
+    setBuyRates(prev => [newBuyRate, ...prev].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime()));
     setLoading(false);
     return newBuyRate;
   }, []);
@@ -215,7 +287,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return updated;
       }
       return br;
-    }));
+    }).sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime()));
     setLoading(false);
     return updated;
   }, []);
@@ -242,7 +314,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     await simulateDelay();
     const newSchedule: Schedule = { ...data, id: `SCH-${String(Date.now()).slice(-6)}` };
-    setSchedules(prev => [newSchedule, ...prev]);
+    setSchedules(prev => [newSchedule, ...prev].sort((a,b) => new Date(b.etd).getTime() - new Date(a.etd).getTime()));
     setLoading(false);
     return newSchedule;
   }, []);
@@ -257,7 +329,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return updated;
       }
       return s;
-    }));
+    }).sort((a,b) => new Date(b.etd).getTime() - new Date(a.etd).getTime()));
     setLoading(false);
     return updated;
   }, []);
@@ -290,6 +362,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       ports, quotations, bookings, buyRates, schedules, scheduleRates, loading,
+      quotationStatusSummary, bookingsByMonth, // Provide dashboard data
       fetchQuotations, getQuotationById, createQuotation, updateQuotation, deleteQuotation, searchQuotations,
       fetchBookings, getBookingById, createBooking, updateBooking,
       fetchBuyRates, createBuyRate, updateBuyRate, deleteBuyRate,

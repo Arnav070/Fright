@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,25 +7,26 @@ import { PageHeader } from "@/components/common/PageHeader";
 import Link from "next/link";
 import { PlusCircle, BarChart3, PieChart as PieChartIcon, Users, Settings, Ship, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockQuotationStatusSummary, mockBookingsByMonth } from "@/lib/mockData";
+import { useData } from "@/contexts/DataContext"; // Import useData
+import type { QuotationStatusSummary, BookingsByMonthEntry } from "@/lib/types"; // Import types
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, XAxis, YAxis, CartesianGrid, Bar } from 'recharts';
-import { useTheme } from "next-themes"; // Assuming next-themes is or could be used for light/dark mode theming for charts
 import { useEffect, useState } from "react";
 
-const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))'];
+const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']; // Added one more for Cancelled if needed
 const BAR_CHART_COLORS = ['hsl(var(--chart-1))'];
 
-function QuotationStatusPieChart() {
-  const data = [
-    { name: 'Draft', value: mockQuotationStatusSummary.draft },
-    { name: 'Submitted', value: mockQuotationStatusSummary.submitted },
-    { name: 'Booking Completed', value: mockQuotationStatusSummary.completed },
-  ];
-
-  // Client-side rendering for charts to avoid hydration mismatch with themes
+function QuotationStatusPieChart({ summaryData }: { summaryData: QuotationStatusSummary | null }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
+
+  if (!mounted || !summaryData) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
+
+  const data = [
+    { name: 'Draft', value: summaryData.draft },
+    { name: 'Submitted', value: summaryData.submitted },
+    { name: 'Booking Completed', value: summaryData.completed },
+    // { name: 'Cancelled', value: summaryData.cancelled }, // Optionally include cancelled
+  ];
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -41,18 +43,18 @@ function QuotationStatusPieChart() {
   );
 }
 
-function BookingsByMonthBarChart() {
-   // Client-side rendering for charts
+function BookingsByMonthBarChart({ monthlyData }: { monthlyData: BookingsByMonthEntry[] | null }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
+
+  if (!mounted || !monthlyData) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={mockBookingsByMonth}>
+      <BarChart data={monthlyData}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="month" />
-        <YAxis />
+        <YAxis allowDecimals={false} />
         <Tooltip />
         <Legend />
         <Bar dataKey="count" name="Bookings" fill={BAR_CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
@@ -63,6 +65,7 @@ function BookingsByMonthBarChart() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { quotationStatusSummary, bookingsByMonth, loading: dataLoading } = useData(); // Get live data
 
   return (
     <div className="space-y-6">
@@ -75,7 +78,11 @@ export default function DashboardPage() {
             <CardDescription>Distribution of current quotation statuses.</CardDescription>
           </CardHeader>
           <CardContent>
-            <QuotationStatusPieChart />
+            {dataLoading && (!quotationStatusSummary || Object.keys(quotationStatusSummary).length === 0) ? (
+                 <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />
+            ) : (
+                <QuotationStatusPieChart summaryData={quotationStatusSummary} />
+            )}
           </CardContent>
         </Card>
 
@@ -85,7 +92,11 @@ export default function DashboardPage() {
             <CardDescription>Number of bookings created over the last few months.</CardDescription>
           </CardHeader>
           <CardContent>
-            <BookingsByMonthBarChart />
+             {dataLoading && (!bookingsByMonth || bookingsByMonth.length === 0) ? (
+                 <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />
+            ) : (
+                <BookingsByMonthBarChart monthlyData={bookingsByMonth} />
+            )}
           </CardContent>
         </Card>
       </div>

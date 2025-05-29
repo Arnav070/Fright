@@ -91,3 +91,16 @@ export interface Port {
   name: string;
   country: string;
 }
+
+// Types for dashboard data
+export interface QuotationStatusSummary {
+  draft: number;
+  submitted: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface BookingsByMonthEntry {
+  month: string;
+  count: number;
+}
