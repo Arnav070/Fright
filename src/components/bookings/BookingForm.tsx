@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -17,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Booking, Quotation, ScheduleRate } from '@/lib/types';
-import { DataTable, ColumnDef } from '@/components/common/DataTable';
+import { DataTable, type ColumnDef } from '@/components/common/DataTable';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Search } from 'lucide-react';
@@ -78,10 +79,13 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     resolver: zodResolver(bookingFormSchema),
     defaultValues: initialData ? {
         ...initialData,
-        quotationIdSearch: initialData.quotationId,
+        quotationIdSearch: initialData.quotationId || '',
+        customerNameSearch: '', // Initialize even if editing for consistency
         selectedQuotationId: initialData.quotationId,
         notes: (initialData as any).notes || '',
     } : {
+      quotationIdSearch: '',
+      customerNameSearch: '',
       status: 'Booked',
       notes: '',
     },
@@ -95,11 +99,32 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
   React.useEffect(() => {
     if (selectedQuotationId) {
       const fetchAndSetQuotation = async () => {
-        const q = initialData && initialData.quotationId === selectedQuotationId 
-            ? initialData // If editing, use initial data's quotation details
-            : await getQuotationById(selectedQuotationId); 
+        // Try to find in already searched quotations first
+        let quotationData = searchedQuotations.find(sq => sq.id === selectedQuotationId);
 
-        const quotationData = searchedQuotations.find(sq => sq.id === selectedQuotationId);
+        if (!quotationData) {
+            // If editing and the selectedQuotationId matches initialData's quotationId, use initialData details
+            if (initialData && initialData.quotationId === selectedQuotationId) {
+                 quotationData = { // Reconstruct a Quotation-like object from Booking initialData
+                    id: initialData.quotationId,
+                    customerName: initialData.customerName,
+                    pol: initialData.pol,
+                    pod: initialData.pod,
+                    equipment: initialData.equipment,
+                    volume: initialData.volume,
+                    type: initialData.type,
+                    sellRate: initialData.sellRate,
+                    buyRate: initialData.buyRate, // This is booking's buy rate, quotation original might differ
+                    profitAndLoss: initialData.profitAndLoss,
+                    status: 'Booking Completed', // Assume if it's a booking, quotation was completed
+                    createdAt: initialData.createdAt, // Not strictly quotation's but okay for display
+                    updatedAt: initialData.updatedAt,
+                };
+            } else {
+                // Fetch from backend if not found in searched or initialData
+                quotationData = await getQuotationById(selectedQuotationId);
+            }
+        }
         
         if (quotationData) {
           form.setValue('customerName', quotationData.customerName);
@@ -130,7 +155,11 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
 
   const handleSearchQuotations = async () => {
     setQuotationSearchLoading(true);
-    const term = form.getValues('quotationIdSearch') || form.getValues('customerNameSearch') || '';
+    const idTerm = form.getValues('quotationIdSearch');
+    const nameTerm = form.getValues('customerNameSearch');
+    
+    const term = idTerm || nameTerm || '';
+
     if (term) {
       const results = await searchQuotations(term);
       setSearchedQuotations(results);
@@ -301,7 +330,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
   };
 
   const handleFormSubmit = async (data: BookingFormValues) => {
-    if (!data.buyRate) { // Ensure buy rate is set for booking either via selection or manual
+    if (data.buyRate === undefined || data.buyRate === null || isNaN(data.buyRate)) { 
         form.setError("buyRate", { type: "manual", message: "A buy rate for the booking is required." });
         setCurrentStep("step3");
         return;
@@ -327,7 +356,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
             <AccordionTrigger className="text-lg font-semibold">Step 3: Rates & Allocation for Booking</AccordionTrigger>
             <AccordionContent className="pt-4">{renderStep3()}</AccordionContent>
           </AccordionItem>
-          <AccordionItem value="step4" disabled={!selectedQuotationId || (!selectedCarrierRateId && !form.getValues('buyRate'))}>
+          <AccordionItem value="step4" disabled={!selectedQuotationId || (form.getValues('buyRate') === undefined && !selectedCarrierRateId )}>
             <AccordionTrigger className="text-lg font-semibold">Step 4: Review & Submit</AccordionTrigger>
             <AccordionContent className="pt-4">{renderStep4()}</AccordionContent>
           </AccordionItem>
@@ -363,3 +392,4 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     </Form>
   );
 }
+
