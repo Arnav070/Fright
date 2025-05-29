@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // If using next-themes, and it causes issues with server components or build:
+  // experimental: {
+  //   serverComponentsExternalPackages: ['@radix-ui/*'], // Example
+  // },
+  // transpilePackages: ['next-themes'], // Example if next-themes needs transpilation
 };
 
 export default nextConfig;
