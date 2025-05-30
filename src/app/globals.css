@@ -35,7 +35,7 @@ body {
 
     --border: 220 15% 88%; 
     --input: 220 15% 92%; 
-    --ring: 346 70% 54%; /* Ring color based on new primary */
+    --ring: 346 70% 54%; /* Ring color based on new primary #BB2649 */
 
     --chart-1: 217 91% 60%;
     --chart-2: 35 92% 62%;
@@ -45,25 +45,26 @@ body {
 
     --radius: 0.5rem;
 
-    /* Sidebar specific theme - Light grey */
-    --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
-    --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
-    --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
-    --sidebar-primary-foreground: 220 15% 20%; /* Darker text for active/hover */
-    --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
-    --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
-    --sidebar-border: 220 15% 88%;     /* Subtle border */
-    --sidebar-ring: 346 70% 54%;       /* Ring color based on new primary for consistency if used */
+    /* Sidebar specific theme - White Background */
+    --sidebar-background: 0 0% 100%;         /* White */
+    --sidebar-foreground: 220 15% 25%;       /* Dark Grey text/icons for contrast */
+    --sidebar-primary: 220 15% 92%;          /* Very Light Grey for active/hover bg */
+    --sidebar-primary-foreground: 346 66% 44%;/* Primary red #BB2649 for active/hover text */
+    --sidebar-accent: 220 15% 92%;           /* Very Light Grey for accent bg */
+    --sidebar-accent-foreground: 346 66% 44%; /* Primary red #BB2649 for accent text */
+    --sidebar-border: 220 15% 88%;           /* Light Grey border */
+    --sidebar-ring: 346 70% 54%;             /* Ring color based on primary #BB2649 */
 
     /* Heading color variable */
-    --heading-foreground: 344 65% 44%; /* #BB2649 */
+    --heading-foreground: 346 66% 44%; /* #BB2649 */
   }
 
   .dark {
-    --background: 0 0% 100%; /* Pure White for dark theme as well for consistency with user request */
+    /* Keeping dark theme consistent with light page background for now */
+    --background: 0 0% 100%; 
     --foreground: 220 15% 25%; 
 
-    --card: 220 15% 15%; /* Standard dark card, can be adjusted if a lighter "dark mode" is desired */
+    --card: 220 15% 15%; 
     --card-foreground: 220 10% 85%;
 
     --popover: 220 15% 15%; 
@@ -86,7 +87,7 @@ body {
 
     --border: 220 15% 22%; 
     --input: 220 15% 18%; 
-    --ring: 346 70% 54%; /* Ring color based on new primary */
+    --ring: 346 70% 54%; /* Ring color based on primary #BB2649 */
 
     --chart-1: 217 91% 70%;
     --chart-2: 35 92% 70%;
@@ -94,18 +95,18 @@ body {
     --chart-4: 280 60% 70%;
     --chart-5: 50 70% 65%;
     
-    /* Sidebar specific theme for dark mode - Kept as Light Grey */
-    --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
-    --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
-    --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
-    --sidebar-primary-foreground: 220 15% 20%; /* Darker text for active/hover */
-    --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
-    --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
-    --sidebar-border: 220 15% 88%;     /* Subtle border */
-    --sidebar-ring: 346 70% 54%;       /* Ring color based on new primary for consistency */
+    /* Sidebar specific theme for dark mode - White Background */
+    --sidebar-background: 0 0% 100%;         /* White */
+    --sidebar-foreground: 220 15% 25%;       /* Dark Grey text/icons */
+    --sidebar-primary: 220 15% 92%;          /* Very Light Grey for active/hover bg */
+    --sidebar-primary-foreground: 346 66% 44%;/* Primary red #BB2649 for active/hover text */
+    --sidebar-accent: 220 15% 92%;           /* Very Light Grey for accent bg */
+    --sidebar-accent-foreground: 346 66% 44%; /* Primary red #BB2649 for accent text */
+    --sidebar-border: 220 15% 88%;           /* Light Grey border */
+    --sidebar-ring: 346 70% 54%;             /* Ring color based on primary #BB2649 */
 
     /* Heading color variable for dark mode */
-    --heading-foreground: 344 65% 44%; /* #BB2649 */
+    --heading-foreground: 346 66% 44%; /* #BB2649 */
   }
 }
 
