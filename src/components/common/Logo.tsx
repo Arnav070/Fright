@@ -16,35 +16,33 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
   const sizeConfig = {
     sm: { 
       width: 90, height: 20, fontSize: 16,
-      // Kerning/spacing factors for tspans
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.05, // Adjusted to tuck 'y'
-      // Factors for the 'l' top bar path, relative to viewBox and fontSize
-      l_top_bar_x_start_factor_vb: 0.47, // Start X of bar (of viewBoxWidth)
-      l_top_bar_y_start_factor_vb: 0.22, // Top Y of bar (of viewBoxHeight)
-      l_top_bar_width_factor_fs: 0.85,    // Total width of bar (of fontSize)
-      l_top_bar_thickness_factor_fs: 0.18, // Thickness of bar (of fontSize)
-      l_top_bar_slant_factor_fs: 0.25,   // Horizontal projection of the slant (of fontSize)
+      y_tspan_dx_factor: -0.15, // Adjusted to tuck 'y' more
+      l_top_bar_x_start_factor_vb: 0.47, 
+      l_top_bar_y_start_factor_vb: 0.22, 
+      l_top_bar_width_factor_fs: 0.90,    // Adjusted width
+      l_top_bar_thickness_factor_fs: 0.20, // Adjusted thickness
+      l_top_bar_slant_factor_fs: 0.20,   // Adjusted slant
     },
     md: { 
       width: 110, height: 24, fontSize: 20, 
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.05,
+      y_tspan_dx_factor: -0.15, // Adjusted to tuck 'y' more
       l_top_bar_x_start_factor_vb: 0.47,
       l_top_bar_y_start_factor_vb: 0.22,
-      l_top_bar_width_factor_fs: 0.85,
-      l_top_bar_thickness_factor_fs: 0.18,
-      l_top_bar_slant_factor_fs: 0.25,
+      l_top_bar_width_factor_fs: 0.90,    // Adjusted width
+      l_top_bar_thickness_factor_fs: 0.20, // Adjusted thickness
+      l_top_bar_slant_factor_fs: 0.20,   // Adjusted slant
     },
     lg: { 
       width: 130, height: 28, fontSize: 24, 
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.05,
+      y_tspan_dx_factor: -0.15, // Adjusted to tuck 'y' more
       l_top_bar_x_start_factor_vb: 0.47,
       l_top_bar_y_start_factor_vb: 0.22,
-      l_top_bar_width_factor_fs: 0.85,
-      l_top_bar_thickness_factor_fs: 0.18,
-      l_top_bar_slant_factor_fs: 0.25,
+      l_top_bar_width_factor_fs: 0.90,    // Adjusted width
+      l_top_bar_thickness_factor_fs: 0.20, // Adjusted thickness
+      l_top_bar_slant_factor_fs: 0.20,   // Adjusted slant
     },
   };
 
@@ -53,24 +51,17 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
   const redColor = "#D81E05";   
 
   const viewBoxWidth = 100; 
-  const viewBoxHeight = (current.fontSize / 16) * 20; // Maintain aspect ratio based on font size
+  const viewBoxHeight = (current.fontSize / 16) * 20; 
 
-  // Calculate tspan dx values
   const l_dx = current.fontSize * current.l_tspan_dx_factor;
   const y_dx = current.fontSize * current.y_tspan_dx_factor;
 
-  // Calculate dimensions for the 'l' top bar path
   const pathStartX = viewBoxWidth * current.l_top_bar_x_start_factor_vb;
   const pathStartY = viewBoxHeight * current.l_top_bar_y_start_factor_vb;
   const pathBarThickness = current.fontSize * current.l_top_bar_thickness_factor_fs;
   const pathBarWidth = current.fontSize * current.l_top_bar_width_factor_fs;
   const pathSlantHorizontal = current.fontSize * current.l_top_bar_slant_factor_fs;
 
-  // Define the SVG path for the 'l' top bar
-  // P1: Top-left of bar
-  // P2: Top-right of bar
-  // P3: Bottom-right of bar (slanted edge)
-  // P4: Bottom-left of bar
   const p1x = pathStartX;
   const p1y = pathStartY;
   const p2x = pathStartX + pathBarWidth;
@@ -107,7 +98,6 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
           <tspan dx={l_dx} fill={redColor}>l</tspan>
           <tspan dx={y_dx} fill={purpleColor}>y</tspan>
         </text>
-        {/* Path for the stylized top bar of 'l' */}
         <path d={lTopBarPathData} fill={redColor} />
       </svg>
     </Link>
