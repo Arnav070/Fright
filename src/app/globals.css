@@ -9,8 +9,8 @@ body {
 
 @layer base {
   :root {
-    --background: 280 40% 55%; /* Plum */
-    --foreground: 280 25% 95%; /* Light lavender text on plum */
+    --background: 0 0% 100%; /* White */
+    --foreground: 220 15% 25%; /* Dark grayish blue for text on white */
 
     --card: 0 0% 100%; 
     --card-foreground: 220 15% 25%;
@@ -60,9 +60,9 @@ body {
   }
 
   .dark {
-    /* Dark mode will also use plum background for consistency with request */
-    --background: 280 40% 55%; /* Plum */
-    --foreground: 280 25% 95%; /* Light lavender text on plum */
+    /* Dark mode will also use white background for consistency with request */
+    --background: 0 0% 100%; /* White */
+    --foreground: 220 15% 25%; /* Dark grayish blue for text on white */
 
     /* Cards and popovers in dark mode can be dark themed */
     --card: 220 15% 15%; 
