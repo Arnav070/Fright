@@ -45,15 +45,15 @@ body {
 
     --radius: 0.5rem;
 
-    /* Sidebar specific theme - kept distinct unless specified otherwise */
-    --sidebar-background: 220 18% 24%;
-    --sidebar-foreground: 220 15% 85%;
-    --sidebar-primary: 217 91% 70%;
-    --sidebar-primary-foreground: 217 91% 15%;
-    --sidebar-accent: 220 18% 30%;
-    --sidebar-accent-foreground: 220 15% 90%;
-    --sidebar-border: 220 18% 18%;
-    --sidebar-ring: 217 91% 70%;
+    /* Sidebar specific theme - Updated to light grey */
+    --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
+    --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
+    --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
+    --sidebar-primary-foreground: 220 15% 20%; /* Darker text for active/hover */
+    --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
+    --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
+    --sidebar-border: 220 15% 88%;     /* Subtle border */
+    --sidebar-ring: 217 91% 70%;       /* Existing ring color */
 
     /* New heading color variable */
     --heading-foreground: 344 65% 44%; /* #BB2649 */
@@ -94,15 +94,15 @@ body {
     --chart-4: 280 60% 70%;
     --chart-5: 50 70% 65%;
     
-    /* Sidebar specific theme for dark mode - kept distinct */
-    --sidebar-background: 220 15% 12%;
-    --sidebar-foreground: 220 10% 80%;
-    --sidebar-primary: 217 91% 65%; 
-    --sidebar-primary-foreground: 217 91% 10%;
-    --sidebar-accent: 220 15% 22%;
-    --sidebar-accent-foreground: 220 10% 88%;
-    --sidebar-border: 220 15% 10%;
-    --sidebar-ring: 217 91% 65%;
+    /* Sidebar specific theme for dark mode - Updated to light grey */
+    --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
+    --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
+    --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
+    --sidebar-primary-foreground: 220 15% 20%; /* Darker text for active/hover */
+    --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
+    --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
+    --sidebar-border: 220 15% 88%;     /* Subtle border */
+    --sidebar-ring: 217 91% 65%;       /* Existing ring color */
 
     /* New heading color variable for dark mode */
     --heading-foreground: 344 65% 44%; /* #BB2649 */
