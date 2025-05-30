@@ -14,13 +14,13 @@ import type {
   BookingsByMonthEntry
 } from '@/lib/types';
 import {
-  // initialMockQuotations, // Will be replaced by Firestore
-  // initialMockBookings,   // Will be replaced by Firestore
   initialMockBuyRates,
   initialMockSchedules,
-  mockScheduleRates,
+  mockScheduleRates as staticMockScheduleRates, // Renamed to avoid conflict
   mockPorts,
-  simulateDelay
+  simulateDelay,
+  quotationsToSeedFromImage, // Import data for seeding
+  bookingsToSeedFromImageBase // Import data for seeding
 } from '@/lib/mockData';
 import { format, parseISO } from 'date-fns';
 import { db } from '@/lib/firebaseConfig';
@@ -37,6 +37,8 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  where,
+  limit,
 } from 'firebase/firestore';
 
 interface DataContextType {
@@ -46,7 +48,7 @@ interface DataContextType {
   buyRates: BuyRate[];
   schedules: Schedule[];
   scheduleRates: ScheduleRate[];
-  loading: boolean; // General loading for initial data or significant ops
+  loading: boolean; 
 
   quotationStatusSummary: QuotationStatusSummary;
   bookingsByMonth: BookingsByMonthEntry[];
@@ -79,25 +81,23 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Helper to convert Firestore doc to Quotation
 const toQuotation = (docSnap: any): Quotation => {
   const data = docSnap.data();
   return {
     id: docSnap.id,
     ...data,
-    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
   } as Quotation;
 };
 
-// Helper to convert Firestore doc to Booking
 const toBooking = (docSnap: any): Booking => {
   const data = docSnap.data();
   return {
     id: docSnap.id,
     ...data,
-    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
   } as Booking;
 };
 
@@ -108,15 +108,79 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [buyRates, setBuyRates] = useState<BuyRate[]>(initialMockBuyRates);
   const [schedules, setSchedules] = useState<Schedule[]>(initialMockSchedules);
-  const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(mockScheduleRates);
-  const [loading, setLoading] = useState(true); // True initially for fetching data
+  const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(staticMockScheduleRates);
+  const [loading, setLoading] = useState(true); 
 
   const [quotationStatusSummary, setQuotationStatusSummary] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
   const [bookingsByMonth, setBookingsByMonth] = useState<BookingsByMonthEntry[]>([]);
 
+  const seedDatabaseIfEmpty = useCallback(async () => {
+    console.log("Checking if database needs seeding...");
+    const quotationsRef = collection(db, "quotations");
+    const bookingsRef = collection(db, "bookings");
+
+    const quotationsSnapshot = await getDocs(query(quotationsRef, limit(1)));
+    if (quotationsSnapshot.empty) {
+      console.log("Quotations collection is empty. Seeding quotations...");
+      const batch = writeBatch(db);
+      const seededQuotationRefs: { [key: string]: string } = {}; // To map temp ref to Firestore ID
+
+      quotationsToSeedFromImage.forEach((qData, index) => {
+        const docRef = doc(quotationsRef); // Auto-generate ID
+        const profitAndLoss = (qData.sellRate || 0) - (qData.buyRate || 0);
+        batch.set(docRef, {
+          ...qData,
+          profitAndLoss,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        // Create a temporary reference key for linking bookings
+        const tempRefKey = `${qData.customerName}-${qData.pol}-${qData.pod}-${qData.equipment}`;
+        seededQuotationRefs[tempRefKey] = docRef.id;
+      });
+      await batch.commit();
+      console.log(`${quotationsToSeedFromImage.length} quotations seeded.`);
+      
+      // Now seed bookings if empty
+      const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1)));
+      if (bookingsSnapshot.empty) {
+        console.log("Bookings collection is empty. Seeding bookings...");
+        const bookingsBatch = writeBatch(db);
+        bookingsToSeedFromImageBase.forEach(bData => {
+          const tempRefKey = `${bData.quotationRefCustomer}-${bData.quotationRefPol}-${bData.quotationRefPod}-${bData.quotationRefEquipment}`;
+          const quotationId = seededQuotationRefs[tempRefKey];
+
+          if (quotationId) {
+            const bookingDocRef = doc(bookingsRef);
+            const { quotationRefCustomer, quotationRefPol, quotationRefPod, quotationRefEquipment, ...restOfBData } = bData;
+            const profitAndLoss = (bData.sellRate || 0) - (bData.buyRate || 0);
+            bookingsBatch.set(bookingDocRef, {
+              ...restOfBData,
+              quotationId,
+              profitAndLoss,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            console.warn(`Could not find quotation ID for booking: ${tempRefKey}`);
+          }
+        });
+        await bookingsBatch.commit();
+        console.log("Bookings seeded.");
+      } else {
+        console.log("Bookings collection not empty, skipping booking seed.");
+      }
+    } else {
+      console.log("Quotations collection not empty, skipping all seeding.");
+    }
+  }, []);
+
+
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
+      await seedDatabaseIfEmpty(); // Attempt to seed first
+
       const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
       const quotationsSnapshot = await getDocs(quotationsQuery);
       const fetchedQuotations = quotationsSnapshot.docs.map(toQuotation);
@@ -128,11 +192,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setBookings(fetchedBookings);
 
     } catch (error) {
-      console.error("Error fetching data from Firestore:", error);
-      // Potentially set an error state here
+      console.error("Error during data loading or seeding:", error);
     }
     setLoading(false);
-  }, []);
+  }, [seedDatabaseIfEmpty]);
 
   useEffect(() => {
     loadAllData();
@@ -157,7 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
     bookings.forEach(b => {
-      const bookingDate = parseISO(b.createdAt); // Assuming createdAt is ISO string
+      const bookingDate = parseISO(b.createdAt); 
       if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
           const monthName = monthNames[bookingDate.getMonth()];
           countsByMonth[monthName] = (countsByMonth[monthName] || 0) + 1;
@@ -179,13 +242,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number) => {
-    // Pagination from local state for now, as all are fetched initially
     setLoading(true);
-    await simulateDelay(100); // Simulate network
+    // Re-fetch from Firestore for pagination if desired, or use local for simplicity
+    // For now, uses local state after initial load + seed.
+    const allQuotations = quotations.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setLoading(false);
-    return { data: quotations.slice(start, end), total: quotations.length };
+    return { data: allQuotations.slice(start, end), total: allQuotations.length };
   }, [quotations]);
 
   const getQuotationById = useCallback(async (id: string) => {
@@ -212,8 +276,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updatedAt: serverTimestamp(),
       };
       const docRef = await addDoc(collection(db, "quotations"), dataToSave);
-      const newQuotation = { ...quotationData, id: docRef.id, profitAndLoss: dataToSave.profitAndLoss, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; // Approximate for immediate UI update
-      await loadAllData(); // Re-fetch all to ensure consistency
+      // For immediate UI update, create an approximate object. True values come on next load.
+      const newQuotation = { ...quotationData, id: docRef.id, profitAndLoss: dataToSave.profitAndLoss, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      await loadAllData(); 
       setLoading(false);
       return newQuotation;
     } catch (error) {
@@ -230,17 +295,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const currentDocSnap = await getDoc(docRef);
       if (!currentDocSnap.exists()) throw new Error("Quotation not found for update");
       
-      const currentData = currentDocSnap.data() as Quotation;
+      const currentData = toQuotation(currentDocSnap); // Use toQuotation to get proper types
       const currentBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : currentData.buyRate;
       const currentSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : currentData.sellRate;
 
-      const dataToUpdate = {
+      const dataToUpdate: any = { // Use 'any' for Firestore partial update object
         ...quotationData,
         profitAndLoss: (currentSellRate || 0) - (currentBuyRate || 0),
         updatedAt: serverTimestamp(),
       };
       await updateDoc(docRef, dataToUpdate);
-      const updatedQuotation = { ...currentData, ...dataToUpdate, id, updatedAt: new Date().toISOString() } as Quotation; // Approximate for UI
+      const updatedQuotation = { ...currentData, ...dataToUpdate, id, updatedAt: new Date().toISOString() } as Quotation; 
       await loadAllData();
       setLoading(false);
       return updatedQuotation;
@@ -258,7 +323,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const qtnSnap = await getDoc(qtnDocRef);
       if (qtnSnap.exists() && qtnSnap.data().status === 'Booking Completed') {
         setLoading(false);
-        return false;
+        return false; 
       }
       await deleteDoc(qtnDocRef);
       await loadAllData();
@@ -267,17 +332,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error deleting quotation:", error);
       setLoading(false);
-      throw error;
+      throw error; 
     }
   }, [loadAllData]);
 
   const searchQuotations = useCallback(async (searchTerm: string) => {
     setLoading(true);
-    await simulateDelay(); // Keep mock delay for this if it's client-side search for now
     const lowerSearchTerm = searchTerm.toLowerCase();
+    // Client-side search on already loaded quotations
     const results = quotations.filter(q =>
         q.id.toLowerCase().includes(lowerSearchTerm) ||
-        q.customerName.toLowerCase().includes(lowerSearchTerm)
+        q.customerName.toLowerCase().includes(lowerSearchTerm) ||
+        q.pol.toLowerCase().includes(lowerSearchTerm) ||
+        q.pod.toLowerCase().includes(lowerSearchTerm)
     );
     setLoading(false);
     return results;
@@ -287,11 +354,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Booking Operations
   const fetchBookings = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
-    await simulateDelay(100);
+     const allBookings = bookings.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setLoading(false);
-    return { data: bookings.slice(start, end), total: bookings.length };
+    return { data: allBookings.slice(start, end), total: allBookings.length };
   }, [bookings]);
 
    const getBookingById = useCallback(async (id: string) => {
@@ -317,10 +384,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      const bookingDocRef = doc(collection(db, "bookings")); // Auto-generate ID
+      const bookingDocRef = doc(collection(db, "bookings")); 
       batch.set(bookingDocRef, dataToSave);
 
-      // Update related quotation status
       const quotationDocRef = doc(db, "quotations", bookingData.quotationId);
       batch.update(quotationDocRef, { status: 'Booking Completed', updatedAt: serverTimestamp() });
 
@@ -340,7 +406,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const docRef = doc(db, "bookings", id);
-      const dataToUpdate = {
+      const dataToUpdate: any = { // Use 'any' for Firestore partial update object
         ...bookingData,
         updatedAt: serverTimestamp(),
       };
@@ -371,7 +437,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const bookingToDelete = toBooking(bookingSnap);
       batch.delete(bookingDocRef);
 
-      // Revert related quotation status
       const quotationDocRef = doc(db, "quotations", bookingToDelete.quotationId);
       const quotationSnap = await getDoc(quotationDocRef);
       if (quotationSnap.exists() && quotationSnap.data().status === 'Booking Completed') {
@@ -396,15 +461,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await simulateDelay();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
+    const sortedBuyRates = [...buyRates].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime());
     setLoading(false);
-    return { data: buyRates.slice(start, end).sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime()), total: buyRates.length };
+    return { data: sortedBuyRates.slice(start, end), total: sortedBuyRates.length };
   }, [buyRates]);
 
   const createBuyRate = useCallback(async (data: Omit<BuyRate, 'id'>) => {
     setLoading(true);
     await simulateDelay();
     const newBuyRate: BuyRate = { ...data, id: `BR-${String(Date.now()).slice(-6)}` };
-    setBuyRates(prev => [newBuyRate, ...prev].sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime()));
+    setBuyRates(prev => [...prev, newBuyRate].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime()));
     setLoading(false);
     return newBuyRate;
   }, []);
@@ -419,7 +485,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return updated;
       }
       return br;
-    }).sort((a,b) => new Date(b.validTo).getTime() - new Date(a.validTo).getTime()));
+    }).sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime()));
     setLoading(false);
     return updated;
   }, []);
@@ -438,15 +504,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await simulateDelay();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
+    const sortedSchedules = [...schedules].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime());
     setLoading(false);
-    return { data: schedules.slice(start, end).sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()), total: schedules.length };
+    return { data: sortedSchedules.slice(start, end), total: sortedSchedules.length };
   }, [schedules]);
 
   const createSchedule = useCallback(async (data: Omit<Schedule, 'id'>) => {
     setLoading(true);
     await simulateDelay();
     const newSchedule: Schedule = { ...data, id: `SCH-${String(Date.now()).slice(-6)}` };
-    setSchedules(prev => [newSchedule, ...prev].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
+    setSchedules(prev => [...prev, newSchedule].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
     setLoading(false);
     return newSchedule;
   }, []);
