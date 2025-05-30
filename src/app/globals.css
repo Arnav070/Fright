@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    --background: 60 100% 99%; /* #FFFFFB */
+    --background: 0 0% 100%; /* Pure White */
     --foreground: 220 15% 25%;
 
     --card: 0 0% 100%; 
@@ -18,8 +18,8 @@ body {
     --popover: 0 0% 100%; 
     --popover-foreground: 220 15% 25%;
 
-    --primary: 217 91% 60%; 
-    --primary-foreground: 210 40% 98%;
+    --primary: 346 66% 44%; /* #BB2649 */
+    --primary-foreground: 0 0% 100%; /* White */
 
     --secondary: 220 15% 90%; 
     --secondary-foreground: 220 10% 40%;
@@ -35,7 +35,7 @@ body {
 
     --border: 220 15% 88%; 
     --input: 220 15% 92%; 
-    --ring: 217 91% 70%; 
+    --ring: 346 70% 54%; /* Ring color based on new primary */
 
     --chart-1: 217 91% 60%;
     --chart-2: 35 92% 62%;
@@ -45,7 +45,7 @@ body {
 
     --radius: 0.5rem;
 
-    /* Sidebar specific theme - Updated to light grey */
+    /* Sidebar specific theme - Light grey */
     --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
     --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
     --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
@@ -53,24 +53,24 @@ body {
     --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
     --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
     --sidebar-border: 220 15% 88%;     /* Subtle border */
-    --sidebar-ring: 217 91% 70%;       /* Existing ring color */
+    --sidebar-ring: 346 70% 54%;       /* Ring color based on new primary for consistency if used */
 
-    /* New heading color variable */
+    /* Heading color variable */
     --heading-foreground: 344 65% 44%; /* #BB2649 */
   }
 
   .dark {
-    --background: 60 100% 99%; /* #FFFFFB - As per "All screens background" */
-    --foreground: 220 15% 25%; /* Keeping foreground dark for readability on light bg */
+    --background: 0 0% 100%; /* Pure White for dark theme as well for consistency with user request */
+    --foreground: 220 15% 25%; 
 
-    --card: 220 15% 15%; 
+    --card: 220 15% 15%; /* Standard dark card, can be adjusted if a lighter "dark mode" is desired */
     --card-foreground: 220 10% 85%;
 
     --popover: 220 15% 15%; 
     --popover-foreground: 220 10% 85%;
 
-    --primary: 217 91% 70%; 
-    --primary-foreground: 217 91% 15%;
+    --primary: 346 66% 44%; /* #BB2649 */
+    --primary-foreground: 0 0% 100%; /* White */
 
     --secondary: 220 15% 25%; 
     --secondary-foreground: 220 10% 80%;
@@ -86,7 +86,7 @@ body {
 
     --border: 220 15% 22%; 
     --input: 220 15% 18%; 
-    --ring: 217 91% 60%; 
+    --ring: 346 70% 54%; /* Ring color based on new primary */
 
     --chart-1: 217 91% 70%;
     --chart-2: 35 92% 70%;
@@ -94,7 +94,7 @@ body {
     --chart-4: 280 60% 70%;
     --chart-5: 50 70% 65%;
     
-    /* Sidebar specific theme for dark mode - Updated to light grey */
+    /* Sidebar specific theme for dark mode - Kept as Light Grey */
     --sidebar-background: 220 20% 94%; /* Light Grey, e.g., #EFF1F5 */
     --sidebar-foreground: 220 15% 30%; /* Dark Grey text/icons */
     --sidebar-primary: 220 15% 85%;    /* Darker Grey for active/hover bg */
@@ -102,9 +102,9 @@ body {
     --sidebar-accent: 220 15% 85%;     /* Same as primary for this theme */
     --sidebar-accent-foreground: 220 15% 20%; /* Same as primary for this theme */
     --sidebar-border: 220 15% 88%;     /* Subtle border */
-    --sidebar-ring: 217 91% 65%;       /* Existing ring color */
+    --sidebar-ring: 346 70% 54%;       /* Ring color based on new primary for consistency */
 
-    /* New heading color variable for dark mode */
+    /* Heading color variable for dark mode */
     --heading-foreground: 344 65% 44%; /* #BB2649 */
   }
 }
@@ -121,3 +121,4 @@ body {
     color: hsl(var(--heading-foreground));
   }
 }
+
