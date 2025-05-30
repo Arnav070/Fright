@@ -1,9 +1,10 @@
 
-import type { User, UserRole, Quotation, QuotationStatus, Booking, BuyRate, Schedule, Port, ScheduleRate } from './types';
-import { format } from 'date-fns';
+import type { User, Quotation, QuotationStatus, Booking, BuyRate, Schedule, Port, ScheduleRate } from './types';
+import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
 
 const today = new Date();
 const formatDate = (date: Date) => format(date, 'yyyy-MM-dd HH:mm:ss');
+const formatDateShort = (date: Date) => format(date, 'yyyy-MM-dd');
 
 export const mockUsers: User[] = [
   { id: 'admin-001', email: 'admin@cargoly.com', name: 'Admin User', role: 'Admin' },
@@ -13,135 +14,211 @@ export const mockUsers: User[] = [
 ];
 
 export const mockPorts: Port[] = [
+  { code: 'INMAA', name: 'Chennai (Madras)', country: 'India' },
+  { code: 'USLGB', name: 'Long Beach', country: 'USA' },
+  { code: 'CNSGH', name: 'Shanghai', country: 'China' },
+  { code: 'INNSA', name: 'Nhava Sheva', country: 'India' },
+  { code: 'GBFXS', name: 'Felixstowe', country: 'UK' },
+  { code: 'USSAV', name: 'Savannah', country: 'USA' },
+  { code: 'AEDXB', name: 'Dubai', country: 'UAE' },
+  // Keeping some of the previous distinct ports if not directly replaced
   { code: 'SGSIN', name: 'Singapore', country: 'Singapore' },
   { code: 'HKHKG', name: 'Hong Kong', country: 'Hong Kong SAR' },
-  { code: 'CNSHA', name: 'Shanghai', country: 'China' },
-  { code: 'AEJEA', name: 'Jebel Ali', country: 'UAE' },
   { code: 'NLRTM', name: 'Rotterdam', country: 'Netherlands' },
   { code: 'DEHAM', name: 'Hamburg', country: 'Germany' },
-  { code: 'USLAX', name: 'Los Angeles', country: 'USA' },
   { code: 'USNYC', name: 'New York', country: 'USA' },
   { code: 'BEANR', name: 'Antwerp', country: 'Belgium' },
   { code: 'MYPKG', name: 'Port Klang', country: 'Malaysia' },
 ];
 
-const getRandomPort = (): string => mockPorts[Math.floor(Math.random() * mockPorts.length)].name;
-const getRandomStatus = (): QuotationStatus => {
-  const statuses: QuotationStatus[] = ['Draft', 'Submitted', 'Booking Completed', 'Cancelled'];
-  return statuses[Math.floor(Math.random() * statuses.length)];
-};
-const getRandomEquipment = (): string => {
-    const equipments = ['20ft Dry', '40ft Dry', '40ft High Cube', '20ft Reefer'];
-    return equipments[Math.floor(Math.random() * equipments.length)];
-};
-const getRandomVolume = (): string => `${Math.floor(Math.random() * 5) + 1}x${getRandomEquipment().split(' ')[1]}`;
+
+// --- Data from "Rate Filing Quotation" ---
+const rawQuotationData = [
+  { customerName: 'ABC Limited', pol: 'INMAA', pod: 'USLGB', rates: { '20GP': 1100, '40GP': 1200, '40HC': 1200 } },
+  { customerName: 'FED Limited', pol: 'USSAV', pod: 'AEDXB', rates: { '20GP': 920, '40GP': 1100, '40HC': 1100 } },
+  { customerName: 'DEF Limited', pol: 'GBFXS', pod: 'USSAV', rates: { '20GP': 850, '40GP': 1150, '40HC': 1150 } },
+  { customerName: 'DEF Limited', pol: 'INNSA', pod: 'GBFXS', rates: { '20GP': 900, '40GP': 1200, '40HC': 1200 } },
+];
+
+export const initialMockQuotations: Quotation[] = [];
+rawQuotationData.forEach((item, index) => {
+  Object.entries(item.rates).forEach(([equipment, sellRate], eqIndex) => {
+    const buyRate = Math.round(sellRate * 0.8); // Assuming 20% margin for mock
+    initialMockQuotations.push({
+      id: `QTN-${String(1001 + initialMockQuotations.length).padStart(6, '0')}`,
+      customerName: item.customerName,
+      pol: item.pol,
+      pod: item.pod,
+      volume: `1x${equipment}`,
+      equipment: equipment,
+      type: 'Export', // Default
+      buyRate: buyRate,
+      sellRate: sellRate,
+      profitAndLoss: sellRate - buyRate,
+      status: 'Draft', // Default
+      createdAt: formatDate(addDays(today, - (rawQuotationData.length - index))), // Spread out creation dates
+      updatedAt: formatDate(addDays(today, - (rawQuotationData.length - index))),
+      selectedRateId: `DUMMYRATE-${eqIndex}`
+    });
+  });
+});
 
 
-export const initialMockQuotations: Quotation[] = Array.from({ length: 20 }, (_, i) => {
-  const buyRate = Math.floor(Math.random() * 2000) + 500;
-  const sellRate = buyRate + Math.floor(Math.random() * 500) + 100;
-  return {
-    id: `QTN-${String(1001 + i).padStart(6, '0')}`,
-    customerName: `Customer ${String.fromCharCode(65 + (i % 26))}${Math.floor(i/26) || ''}`,
-    pol: getRandomPort(),
-    pod: getRandomPort(),
-    volume: getRandomVolume(),
-    equipment: getRandomEquipment(),
-    type: (i % 2 === 0) ? 'Import' : 'Export',
-    buyRate,
-    sellRate,
+// --- Data from "Booking module" ---
+const rawBookingData = [
+  { pol: 'INMAA', pod: 'USLGB', volumes: 3, equipmentInfo: '20 footer', customerName: 'ABC Limited', typeDetail: 'FCL', freightType: 'FAK' },
+  { pol: 'CNSGH', pod: 'USLGB', volumes: null, equipmentInfo: '11 CBM / 6000 KGS', customerName: 'BCD LIMited', typeDetail: 'LCL', freightType: null },
+  { pol: 'INNSA', pod: 'GBFXS', volumes: 2, equipmentInfo: '40 footer HC', customerName: 'DEF Limited', typeDetail: 'FCL', freightType: 'NAC' },
+  { pol: 'USSAV', pod: 'AEDXB', volumes: 6, equipmentInfo: '40 Footer', customerName: 'FED Limited', typeDetail: 'FCL', freightType: 'FAK' },
+  { pol: 'GBFXS', pod: 'USSAV', volumes: 2, equipmentInfo: '40 Footer', customerName: 'DEF Limited', typeDetail: 'FCL', freightType: 'NAC' },
+];
+
+export const initialMockBookings: Booking[] = [];
+rawBookingData.forEach((item, index) => {
+  let equipment = '';
+  let volume = '';
+
+  if (item.equipmentInfo.includes('20 footer')) equipment = '20GP';
+  else if (item.equipmentInfo.includes('40 footer HC')) equipment = '40HC';
+  else if (item.equipmentInfo.includes('40 Footer')) equipment = '40GP';
+  else if (item.equipmentInfo.includes('CBM')) equipment = 'LCL';
+
+  if (item.volumes) {
+    volume = `${item.volumes}x${equipment} (${item.typeDetail})`;
+  } else if (equipment === 'LCL') {
+    volume = `${item.equipmentInfo} (${item.typeDetail})`;
+  } else {
+    volume = `1x${equipment} (${item.typeDetail})`; // Default if volume count not specified
+  }
+  
+  // Try to find matching quotation for rates
+  const matchingQuotation = initialMockQuotations.find(
+    q => q.customerName === item.customerName && q.pol === item.pol && q.pod === item.pod && q.equipment === equipment
+  );
+
+  let buyRate = equipment === '20GP' ? 800 : (equipment === 'LCL' ? 50 : 1200);
+  let sellRate = equipment === '20GP' ? 1000 : (equipment === 'LCL' ? 70 : 1500);
+
+  if (matchingQuotation) {
+    buyRate = matchingQuotation.buyRate;
+    sellRate = matchingQuotation.sellRate;
+  }
+  
+  initialMockBookings.push({
+    id: `BKNG-${String(2001 + index).padStart(6, '0')}`,
+    quotationId: matchingQuotation ? matchingQuotation.id : `QTN-DUMMY-${index}`,
+    customerName: item.customerName,
+    pol: item.pol,
+    pod: item.pod,
+    volume: volume,
+    equipment: equipment,
+    type: 'Export', // Default
+    buyRate: buyRate,
+    sellRate: sellRate,
     profitAndLoss: sellRate - buyRate,
-    status: getRandomStatus(),
-    createdAt: formatDate(new Date(today.getTime() - (20-i) * 24 * 60 * 60 * 1000)),
-    updatedAt: formatDate(new Date(today.getTime() - (20-i) * 24 * 60 * 60 * 1000)),
-  };
+    status: 'Booked', // Default
+    createdAt: formatDate(addDays(today, - (rawBookingData.length - index))),
+    updatedAt: formatDate(addDays(today, - (rawBookingData.length - index))),
+    selectedCarrierRateId: `DUMMYCARRIERRATE-${index}`
+  });
 });
 
-export const initialMockBookings: Booking[] = initialMockQuotations
-  .filter(q => q.status === 'Booking Completed')
-  .slice(0, 10) // Take up to 10 completed quotations to make bookings
-  .map((q, i) => ({
-    id: `BKNG-${String(2001 + i).padStart(6, '0')}`,
-    quotationId: q.id,
-    customerName: q.customerName,
-    pol: q.pol,
-    pod: q.pod,
-    volume: q.volume,
-    equipment: q.equipment,
-    type: q.type,
-    buyRate: q.buyRate,
-    sellRate: q.sellRate,
-    profitAndLoss: q.profitAndLoss,
-    status: (i % 3 === 0) ? 'Booked' : (i % 3 === 1) ? 'Shipped' : 'Delivered',
-    createdAt: formatDate(new Date(new Date(q.createdAt).getTime() + 24 * 60 * 60 * 1000)), // Booking created after quotation
-    updatedAt: formatDate(new Date(new Date(q.updatedAt).getTime() + 24 * 60 * 60 * 1000)),
-  }));
-
-// Adding more bookings if needed to reach 20
-const additionalBookingsNeeded = 20 - initialMockBookings.length;
-if (additionalBookingsNeeded > 0) {
-    for (let i = 0; i < additionalBookingsNeeded; i++) {
-        const q = initialMockQuotations[i % initialMockQuotations.length]; // reuse some quotations for dummy data
-        initialMockBookings.push({
-            id: `BKNG-${String(2001 + initialMockBookings.length).padStart(6, '0')}`,
-            quotationId: `QTN-DUMMY-${i}`, // a dummy quotation ref
-            customerName: `New Customer ${i}`,
-            pol: getRandomPort(),
-            pod: getRandomPort(),
-            volume: getRandomVolume(),
-            equipment: getRandomEquipment(),
-            type: (i % 2 === 0) ? 'Import' : 'Export',
-            buyRate: q.buyRate,
-            sellRate: q.sellRate,
-            profitAndLoss: q.profitAndLoss,
-            status: (i % 3 === 0) ? 'Booked' : (i % 3 === 1) ? 'Shipped' : 'Delivered',
-            createdAt: formatDate(new Date(today.getTime() - (10-i) * 24 * 60 * 60 * 1000)),
-            updatedAt: formatDate(new Date(today.getTime() - (10-i) * 24 * 60 * 60 * 1000)),
-        });
-    }
-}
-
-
-export const initialMockBuyRates: BuyRate[] = Array.from({ length: 15 }, (_, i) => ({
-  id: `BR-${String(3001 + i).padStart(4, '0')}`,
-  carrier: `Carrier ${String.fromCharCode(65 + (i % 5))}`, // 5 unique carriers
-  pol: getRandomPort(),
-  pod: getRandomPort(),
-  commodity: (i % 2 === 0) ? 'General Cargo' : 'Electronics',
-  freightModeType: (i % 3 === 0) ? 'Sea' : (i % 3 === 1) ? 'Air' : 'Land',
-  equipment: getRandomEquipment(),
-  weightCapacity: `${Math.floor(Math.random() * 20) + 5} TON`,
-  minBooking: `${Math.floor(Math.random() * 2) + 1} TEU`,
-  rate: Math.floor(Math.random() * 1500) + 300,
-  validFrom: formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-  validTo: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
-}));
-
-export const initialMockSchedules: Schedule[] = Array.from({ length: 12 }, (_, i) => ({
-  id: `SCH-${String(4001 + i).padStart(4, '0')}`,
-  carrier: `Carrier ${String.fromCharCode(65 + (i % 5))}`,
-  origin: getRandomPort(),
-  destination: getRandomPort(),
-  serviceRoute: `SRVC-${String.fromCharCode(88 + (i % 3))}${100+i}`, // SRVC-X100, SRVC-Y101, SRVC-Z102
-  allocation: Math.floor(Math.random() * 50) + 10, // 10 to 60 units
-  etd: formatDate(new Date(today.getTime() + i * 7 * 24 * 60 * 60 * 1000)), // Weekly departures starting today
-  eta: formatDate(new Date(today.getTime() + (i * 7 + (Math.floor(Math.random()*10)+10)) * 24 * 60 * 60 * 1000)), // ETA 10-20 days after ETD
-  frequency: (i % 4 === 0) ? 'Daily' : (i % 4 === 1) ? 'Weekly' : (i % 4 === 2) ? 'Bi-Weekly' : 'Monthly',
-}));
-
-export const mockScheduleRates: ScheduleRate[] = Array.from({ length: 30 }, (_, i) => {
-  const origin = getRandomPort();
-  const destination = getRandomPort();
-  return {
-    id: `SRATE-${String(5001 + i).padStart(5, '0')}`,
-    carrier: `Carrier ${String.fromCharCode(65 + (i % 5))}`,
-    origin: origin,
-    destination: destination === origin ? getRandomPort() : destination, // ensure origin and dest are different
-    voyageDetails: `V${1000+i}W / ${format(new Date(today.getTime() + (i % 7) * 24 * 60 * 60 * 1000), 'ddMMMyy').toUpperCase()}`,
-    buyRate: Math.floor(Math.random() * 1800) + 400,
-    allocation: Math.floor(Math.random() * 20) + 5,
-  };
+// Mark related quotations as 'Booking Completed'
+initialMockBookings.forEach(booking => {
+  const qIndex = initialMockQuotations.findIndex(q => q.id === booking.quotationId);
+  if (qIndex !== -1) {
+    initialMockQuotations[qIndex].status = 'Booking Completed';
+    initialMockQuotations[qIndex].updatedAt = formatDate(new Date(booking.createdAt));
+  }
 });
+
+
+// --- Data from "Freight Module (Buyrates)" ---
+const rawBuyRateData = [
+  { carrier: 'ONEY', pol: 'INMAA', pod: 'USLGB', commodity: 'GDSM', rates: { '20GP': 1200, '40GP': 1150, '40HC': 1150 } },
+  { carrier: 'MAEU', pol: 'INMAA', pod: 'USLGB', commodity: 'GDSM', rates: { '20GP': 1100, '40GP': 1200, '40HC': 1200 } },
+  { carrier: 'HLCU', pol: 'INMAA', pod: 'USLGB', commodity: 'GDSM', rates: { '20GP': 900, '40GP': 1600, '40HC': 1600 } },
+  { carrier: 'ONEY', pol: 'INNSA', pod: 'GBFXS', commodity: 'GDSM', rates: { '20GP': 1100, '40GP': 1375, '40HC': 1375 } },
+  { carrier: 'HLCU', pol: 'INNSA', pod: 'GBFXS', commodity: 'GDSM', rates: { '20GP': 1200, '40GP': 1450, '40HC': 1450 } },
+  { carrier: 'MAEU', pol: 'INNSA', pod: 'GBFXS', commodity: 'GDSM', rates: { '20GP': 1000, '40GP': 1400, '40HC': 1400 } },
+  { carrier: 'HLCU', pol: 'USSAV', pod: 'AEDXB', commodity: 'GDSM', rates: { '20GP': 880, '40GP': 1000, '40HC': 1000 } },
+  { carrier: 'ONEY', pol: 'USSAV', pod: 'AEDXB', commodity: 'GDSM', rates: { '20GP': 980, '40GP': 1150, '40HC': 1150 } },
+  { carrier: 'MAEU', pol: 'GBFXS', pod: 'USSAV', commodity: 'GDSM', rates: { '20GP': 1000, '40GP': 1100, '40HC': 1100 } },
+  { carrier: 'MSCU', pol: 'GBFXS', pod: 'USSAV', commodity: 'GDSM', rates: { '20GP': 990, '40GP': 1200, '40HC': 1200 } },
+  { carrier: 'ONEY', pol: 'GBFXS', pod: 'USSAV', commodity: 'GDSM', rates: { '20GP': 800, '40GP': 1200, '40HC': 1200 } },
+];
+
+export const initialMockBuyRates: BuyRate[] = [];
+rawBuyRateData.forEach((item) => {
+  Object.entries(item.rates).forEach(([equipmentKey, rate]) => {
+    initialMockBuyRates.push({
+      id: `BR-${String(3001 + initialMockBuyRates.length).padStart(4, '0')}`,
+      carrier: item.carrier,
+      pol: item.pol,
+      pod: item.pod,
+      commodity: item.commodity,
+      freightModeType: 'Sea', // Default
+      equipment: equipmentKey, // '20GP', '40GP', '40HC'
+      weightCapacity: equipmentKey === '20GP' ? '21 TON' : (equipmentKey === '40GP' ? '26 TON' : '28 TON'), // Example capacity
+      minBooking: '1 TEU', // Default
+      rate: rate,
+      validFrom: formatDateShort(startOfMonth(today)),
+      validTo: formatDateShort(endOfMonth(today)),
+    });
+  });
+});
+
+
+// --- Data from "Schedule" ---
+const rawScheduleData = [
+  { carrier: 'ONEY', origin: 'INMAA', destination: 'USLGB', serviceRoute: 'O1', allocation: 5 },
+  { carrier: 'MAEU', origin: 'INMAA', destination: 'USLGB', serviceRoute: 'M1', allocation: 2 },
+  { carrier: 'HLCU', origin: 'INMAA', destination: 'USLGB', serviceRoute: 'H1', allocation: 3 },
+  { carrier: 'ONEY', origin: 'INNSA', destination: 'GBFXS', serviceRoute: 'O2', allocation: 1 },
+  { carrier: 'MAEU', origin: 'INNSA', destination: 'GBFXS', serviceRoute: 'M2', allocation: 3 },
+  { carrier: 'HLCU', origin: 'INNSA', destination: 'GBFXS', serviceRoute: 'H2', allocation: 4 },
+  { carrier: 'ONEY', origin: 'USSAV', destination: 'AEDXB', serviceRoute: 'O3', allocation: 4 },
+  { carrier: 'MAEU', origin: 'USSAV', destination: 'AEDXB', serviceRoute: 'M3', allocation: 4 },
+  { carrier: 'HLCU', origin: 'USSAV', destination: 'AEDXB', serviceRoute: 'H3', allocation: 4 },
+  { carrier: 'ONEY', origin: 'GBFXS', destination: 'USSAV', serviceRoute: 'O4', allocation: 3 },
+  { carrier: 'MAEU', origin: 'GBFXS', destination: 'USSAV', serviceRoute: 'M4', allocation: 2 },
+  { carrier: 'HLCU', origin: 'GBFXS', destination: 'USSAV', serviceRoute: 'H4', allocation: 3 },
+];
+
+export const initialMockSchedules: Schedule[] = rawScheduleData.map((item, index) => ({
+  id: `SCH-${String(4001 + index).padStart(4, '0')}`,
+  carrier: item.carrier,
+  origin: item.origin,
+  destination: item.destination,
+  serviceRoute: item.serviceRoute,
+  allocation: item.allocation,
+  etd: formatDate(addDays(today, index * 7)), // Weekly departures from today
+  eta: formatDate(addDays(today, (index * 7) + (Math.floor(Math.random() * 10) + 15))), // ETA 15-25 days after ETD
+  frequency: 'Weekly', // Default
+}));
+
+// --- Derived mockScheduleRates ---
+export const mockScheduleRates: ScheduleRate[] = [];
+initialMockSchedules.forEach((schedule, index) => {
+  // Find a representative buy rate (e.g., for 20GP) for this schedule's route and carrier
+  const representativeBuyRate = initialMockBuyRates.find(
+    br => br.carrier === schedule.carrier &&
+          br.pol === schedule.origin &&
+          br.pod === schedule.destination &&
+          br.equipment === '20GP' // Using 20GP as a common representative equipment
+  );
+
+  mockScheduleRates.push({
+    id: `SRATE-${String(5001 + index).padStart(5, '0')}`,
+    carrier: schedule.carrier,
+    origin: schedule.origin,
+    destination: schedule.destination,
+    voyageDetails: `${schedule.serviceRoute} / ${format(new Date(schedule.etd), 'ddMMMyy').toUpperCase()}`,
+    buyRate: representativeBuyRate ? representativeBuyRate.rate : (Math.floor(Math.random() * 1000) + 500), // Fallback buy rate
+    allocation: schedule.allocation,
+  });
+});
+
 
 // Helper to simulate API delay
-export const simulateDelay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms));
+export const simulateDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
