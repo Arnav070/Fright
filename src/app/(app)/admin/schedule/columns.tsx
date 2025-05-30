@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { ColumnDef } from "@/components/common/DataTable";
 import type { Schedule } from "@/lib/types";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Import parseISO
 
 export const getScheduleColumns = (): ColumnDef<Schedule>[] => [
   { accessorKey: "carrier", header: "Carrier" },
@@ -17,12 +18,12 @@ export const getScheduleColumns = (): ColumnDef<Schedule>[] => [
   { 
     accessorKey: "etd", 
     header: "ETD",
-    cell: ({ row }) => format(new Date(row.original.etd), "dd MMM yy, HH:mm")
+    cell: ({ row }) => format(parseISO(row.original.etd), "dd MMM yy, HH:mm") // Parse ISO string
   },
   { 
     accessorKey: "eta", 
     header: "ETA",
-    cell: ({ row }) => format(new Date(row.original.eta), "dd MMM yy, HH:mm")
+    cell: ({ row }) => format(parseISO(row.original.eta), "dd MMM yy, HH:mm") // Parse ISO string
   },
   { accessorKey: "frequency", header: "Frequency" },
 ];

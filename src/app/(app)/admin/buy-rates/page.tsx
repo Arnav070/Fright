@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export default function ManageBuyRatesPage() {
@@ -76,10 +76,13 @@ export default function ManageBuyRatesPage() {
   };
 
   const handleFormSubmit = async (data: BuyRateFormValues) => {
+    // Dates from form are JS Date objects. Firestore can handle them.
+    // If your BuyRate type expects string dates, format them here.
+    // Since BuyRate type in types.ts has string dates:
     const formattedData = {
       ...data,
-      validFrom: format(data.validFrom, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-      validTo: format(data.validTo, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+      validFrom: format(data.validFrom, "yyyy-MM-dd"), // Keep as yyyy-MM-dd string as per type
+      validTo: format(data.validTo, "yyyy-MM-dd"),     // Keep as yyyy-MM-dd string as per type
     };
 
     if (editingBuyRate) {

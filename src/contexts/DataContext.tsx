@@ -3,26 +3,41 @@
 
 import type { ReactNode} from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { 
-  Quotation, 
-  Booking, 
-  BuyRate, 
-  Schedule, 
-  ScheduleRate, 
+import type {
+  Quotation,
+  Booking,
+  BuyRate,
+  Schedule,
+  ScheduleRate,
   Port,
   QuotationStatusSummary,
   BookingsByMonthEntry
 } from '@/lib/types';
-import { 
-  initialMockQuotations, 
-  initialMockBookings, 
-  initialMockBuyRates, 
+import {
+  // initialMockQuotations, // Will be replaced by Firestore
+  // initialMockBookings,   // Will be replaced by Firestore
+  initialMockBuyRates,
   initialMockSchedules,
   mockScheduleRates,
   mockPorts,
   simulateDelay
 } from '@/lib/mockData';
 import { format, parseISO } from 'date-fns';
+import { db } from '@/lib/firebaseConfig';
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
+  Timestamp,
+  writeBatch,
+} from 'firebase/firestore';
 
 interface DataContextType {
   ports: Port[];
@@ -31,9 +46,8 @@ interface DataContextType {
   buyRates: BuyRate[];
   schedules: Schedule[];
   scheduleRates: ScheduleRate[];
-  loading: boolean;
+  loading: boolean; // General loading for initial data or significant ops
 
-  // Dashboard specific data
   quotationStatusSummary: QuotationStatusSummary;
   bookingsByMonth: BookingsByMonthEntry[];
 
@@ -42,13 +56,13 @@ interface DataContextType {
   createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => Promise<Quotation>;
   updateQuotation: (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<Quotation | undefined>;
   deleteQuotation: (id: string) => Promise<boolean>;
-  
+
   fetchBookings: (page: number, pageSize: number) => Promise<{ data: Booking[], total: number }>;
   getBookingById: (id: string) => Promise<Booking | undefined>;
   createBooking: (bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Booking>;
   updateBooking: (id: string, bookingData: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<Booking | undefined>;
   deleteBooking: (id: string) => Promise<boolean>;
-  
+
   fetchBuyRates: (page: number, pageSize: number) => Promise<{ data: BuyRate[], total: number }>;
   createBuyRate: (data: Omit<BuyRate, 'id'>) => Promise<BuyRate>;
   updateBuyRate: (id: string, data: Partial<Omit<BuyRate, 'id'>>) => Promise<BuyRate | undefined>;
@@ -59,27 +73,72 @@ interface DataContextType {
   updateSchedule: (id: string, data: Partial<Omit<Schedule, 'id'>>) => Promise<Schedule | undefined>;
   deleteSchedule: (id: string) => Promise<boolean>;
 
-  searchScheduleRates: (params: any) => Promise<ScheduleRate[]>; // params can be pol, pod etc.
+  searchScheduleRates: (params: any) => Promise<ScheduleRate[]>;
   searchQuotations: (searchTerm: string) => Promise<Quotation[]>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// Helper to convert Firestore doc to Quotation
+const toQuotation = (docSnap: any): Quotation => {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+  } as Quotation;
+};
+
+// Helper to convert Firestore doc to Booking
+const toBooking = (docSnap: any): Booking => {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+  } as Booking;
+};
+
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const [ports, setPorts] = useState<Port[]>(mockPorts);
-  const [quotations, setQuotations] = useState<Quotation[]>(initialMockQuotations);
-  const [bookings, setBookings] = useState<Booking[]>(initialMockBookings);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [buyRates, setBuyRates] = useState<BuyRate[]>(initialMockBuyRates);
   const [schedules, setSchedules] = useState<Schedule[]>(initialMockSchedules);
   const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(mockScheduleRates);
-  const [loading, setLoading] = useState(false); // For individual operations
+  const [loading, setLoading] = useState(true); // True initially for fetching data
 
   const [quotationStatusSummary, setQuotationStatusSummary] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
   const [bookingsByMonth, setBookingsByMonth] = useState<BookingsByMonthEntry[]>([]);
 
-  const now = () => format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
+      const quotationsSnapshot = await getDocs(quotationsQuery);
+      const fetchedQuotations = quotationsSnapshot.docs.map(toQuotation);
+      setQuotations(fetchedQuotations);
 
-  // Recalculate quotation status summary when quotations change
+      const bookingsQuery = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
+      const bookingsSnapshot = await getDocs(bookingsQuery);
+      const fetchedBookings = bookingsSnapshot.docs.map(toBooking);
+      setBookings(fetchedBookings);
+
+    } catch (error) {
+      console.error("Error fetching data from Firestore:", error);
+      // Potentially set an error state here
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
+
   useEffect(() => {
     const summary: QuotationStatusSummary = { draft: 0, submitted: 0, completed: 0, cancelled: 0 };
     quotations.forEach(q => {
@@ -91,19 +150,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setQuotationStatusSummary(summary);
   }, [quotations]);
 
-  // Recalculate bookings by month when bookings change
   useEffect(() => {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const countsByMonth: { [key: string]: number } = {};
-    
     const today = new Date();
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
     bookings.forEach(b => {
-      const [datePart] = b.createdAt.split(' ');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const bookingDate = new Date(year, month - 1, day);
-
+      const bookingDate = parseISO(b.createdAt); // Assuming createdAt is ISO string
       if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
           const monthName = monthNames[bookingDate.getMonth()];
           countsByMonth[monthName] = (countsByMonth[monthName] || 0) + 1;
@@ -112,7 +166,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const result: BookingsByMonthEntry[] = [];
     const currentMonthIndex = today.getMonth();
-    for (let i = 5; i >= 0; i--) { 
+    for (let i = 5; i >= 0; i--) {
       const monthIdx = (currentMonthIndex - i + 12) % 12;
       const monthName = monthNames[monthIdx];
       result.push({
@@ -123,164 +177,220 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setBookingsByMonth(result);
   }, [bookings]);
 
-
   // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number) => {
+    // Pagination from local state for now, as all are fetched initially
     setLoading(true);
-    await simulateDelay();
+    await simulateDelay(100); // Simulate network
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setLoading(false);
-    return { data: quotations.slice(start, end).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), total: quotations.length };
+    return { data: quotations.slice(start, end), total: quotations.length };
   }, [quotations]);
 
   const getQuotationById = useCallback(async (id: string) => {
     setLoading(true);
-    await simulateDelay();
-    const quotation = quotations.find(q => q.id === id);
-    setLoading(false);
-    return quotation;
-  }, [quotations]);
+    try {
+      const docRef = doc(db, "quotations", id);
+      const docSnap = await getDoc(docRef);
+      setLoading(false);
+      return docSnap.exists() ? toQuotation(docSnap) : undefined;
+    } catch (error) {
+      console.error("Error fetching quotation by ID:", error);
+      setLoading(false);
+      return undefined;
+    }
+  }, []);
 
   const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
     setLoading(true);
-    await simulateDelay();
-    const newQuotation: Quotation = {
-      ...quotationData,
-      id: `QTN-${String(Date.now()).slice(-6)}`,
-      profitAndLoss: (quotationData.sellRate || 0) - (quotationData.buyRate || 0),
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    setQuotations(prev => [newQuotation, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setLoading(false);
-    return newQuotation;
-  }, []);
+    try {
+      const dataToSave = {
+        ...quotationData,
+        profitAndLoss: (quotationData.sellRate || 0) - (quotationData.buyRate || 0),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const docRef = await addDoc(collection(db, "quotations"), dataToSave);
+      const newQuotation = { ...quotationData, id: docRef.id, profitAndLoss: dataToSave.profitAndLoss, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; // Approximate for immediate UI update
+      await loadAllData(); // Re-fetch all to ensure consistency
+      setLoading(false);
+      return newQuotation;
+    } catch (error) {
+      console.error("Error creating quotation:", error);
+      setLoading(false);
+      throw error;
+    }
+  }, [loadAllData]);
 
   const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => {
     setLoading(true);
-    await simulateDelay();
-    let updatedQuotation: Quotation | undefined;
-    setQuotations(prev => prev.map(q => {
-      if (q.id === id) {
-        const currentBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : q.buyRate;
-        const currentSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : q.sellRate;
-        updatedQuotation = { 
-            ...q, 
-            ...quotationData, 
-            updatedAt: now(),
-            profitAndLoss: (currentSellRate || 0) - (currentBuyRate || 0),
-        };
-        return updatedQuotation;
-      }
-      return q;
-    }).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setLoading(false);
-    return updatedQuotation;
-  }, []);
+    try {
+      const docRef = doc(db, "quotations", id);
+      const currentDocSnap = await getDoc(docRef);
+      if (!currentDocSnap.exists()) throw new Error("Quotation not found for update");
+      
+      const currentData = currentDocSnap.data() as Quotation;
+      const currentBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : currentData.buyRate;
+      const currentSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : currentData.sellRate;
+
+      const dataToUpdate = {
+        ...quotationData,
+        profitAndLoss: (currentSellRate || 0) - (currentBuyRate || 0),
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(docRef, dataToUpdate);
+      const updatedQuotation = { ...currentData, ...dataToUpdate, id, updatedAt: new Date().toISOString() } as Quotation; // Approximate for UI
+      await loadAllData();
+      setLoading(false);
+      return updatedQuotation;
+    } catch (error) {
+      console.error("Error updating quotation:", error);
+      setLoading(false);
+      throw error;
+    }
+  }, [loadAllData]);
 
   const deleteQuotation = useCallback(async (id: string) => {
     setLoading(true);
-    await simulateDelay();
-    const qtn = quotations.find(q => q.id === id);
-    if (qtn && qtn.status === 'Booking Completed') {
+    try {
+      const qtnDocRef = doc(db, "quotations", id);
+      const qtnSnap = await getDoc(qtnDocRef);
+      if (qtnSnap.exists() && qtnSnap.data().status === 'Booking Completed') {
+        setLoading(false);
+        return false;
+      }
+      await deleteDoc(qtnDocRef);
+      await loadAllData();
       setLoading(false);
-      return false; // Cannot delete if booking completed
+      return true;
+    } catch (error) {
+      console.error("Error deleting quotation:", error);
+      setLoading(false);
+      throw error;
     }
-    setQuotations(prev => prev.filter(q => q.id !== id));
-    setLoading(false);
-    return true;
-  }, [quotations]);
+  }, [loadAllData]);
 
   const searchQuotations = useCallback(async (searchTerm: string) => {
     setLoading(true);
-    await simulateDelay();
+    await simulateDelay(); // Keep mock delay for this if it's client-side search for now
     const lowerSearchTerm = searchTerm.toLowerCase();
-    const results = quotations.filter(q => 
-        q.id.toLowerCase().includes(lowerSearchTerm) || 
+    const results = quotations.filter(q =>
+        q.id.toLowerCase().includes(lowerSearchTerm) ||
         q.customerName.toLowerCase().includes(lowerSearchTerm)
     );
     setLoading(false);
     return results;
   }, [quotations]);
 
+
   // Booking Operations
   const fetchBookings = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
-    await simulateDelay();
+    await simulateDelay(100);
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setLoading(false);
-    return { data: bookings.slice(start, end).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), total: bookings.length };
+    return { data: bookings.slice(start, end), total: bookings.length };
   }, [bookings]);
 
    const getBookingById = useCallback(async (id: string) => {
     setLoading(true);
-    await simulateDelay();
-    const booking = bookings.find(b => b.id === id);
-    setLoading(false);
-    return booking;
-  }, [bookings]);
+     try {
+      const docRef = doc(db, "bookings", id);
+      const docSnap = await getDoc(docRef);
+      setLoading(false);
+      return docSnap.exists() ? toBooking(docSnap) : undefined;
+    } catch (error) {
+      console.error("Error fetching booking by ID:", error);
+      setLoading(false);
+      return undefined;
+    }
+  }, []);
 
   const createBooking = useCallback(async (bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>) => {
     setLoading(true);
-    await simulateDelay();
-    const newBooking: Booking = {
-      ...bookingData,
-      id: `BKNG-${String(Date.now()).slice(-6)}`,
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    setBookings(prev => [newBooking, ...prev].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    
-    // Update related quotation status to 'Booking Completed'
-    setQuotations(prevQtns => prevQtns.map(q => 
-      q.id === newBooking.quotationId ? { ...q, status: 'Booking Completed', updatedAt: now() } : q
-    ).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    const batch = writeBatch(db);
+    try {
+      const dataToSave = {
+        ...bookingData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const bookingDocRef = doc(collection(db, "bookings")); // Auto-generate ID
+      batch.set(bookingDocRef, dataToSave);
 
-    setLoading(false);
-    return newBooking;
-  }, []);
+      // Update related quotation status
+      const quotationDocRef = doc(db, "quotations", bookingData.quotationId);
+      batch.update(quotationDocRef, { status: 'Booking Completed', updatedAt: serverTimestamp() });
+
+      await batch.commit();
+      const newBooking = { ...bookingData, id: bookingDocRef.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      await loadAllData();
+      setLoading(false);
+      return newBooking;
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      setLoading(false);
+      throw error;
+    }
+  }, [loadAllData]);
 
   const updateBooking = useCallback(async (id: string, bookingData: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>>) => {
     setLoading(true);
-    await simulateDelay();
-    let updatedBooking: Booking | undefined;
-    setBookings(prev => prev.map(b => {
-      if (b.id === id) {
-        updatedBooking = { ...b, ...bookingData, updatedAt: now() };
-        return updatedBooking;
-      }
-      return b;
-    }).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    setLoading(false);
-    return updatedBooking;
-  }, []);
+    try {
+      const docRef = doc(db, "bookings", id);
+      const dataToUpdate = {
+        ...bookingData,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(docRef, dataToUpdate);
+      const currentDocSnap = await getDoc(docRef);
+      const updatedBooking = currentDocSnap.exists() ? toBooking(currentDocSnap) : undefined;
+      await loadAllData();
+      setLoading(false);
+      return updatedBooking;
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      setLoading(false);
+      throw error;
+    }
+  }, [loadAllData]);
 
   const deleteBooking = useCallback(async (id: string) => {
     setLoading(true);
-    await simulateDelay();
-    const bookingToDelete = bookings.find(b => b.id === id);
-    if (!bookingToDelete) {
+    const batch = writeBatch(db);
+    try {
+      const bookingDocRef = doc(db, "bookings", id);
+      const bookingSnap = await getDoc(bookingDocRef);
+
+      if (!bookingSnap.exists()) {
+        setLoading(false);
+        return false;
+      }
+      const bookingToDelete = toBooking(bookingSnap);
+      batch.delete(bookingDocRef);
+
+      // Revert related quotation status
+      const quotationDocRef = doc(db, "quotations", bookingToDelete.quotationId);
+      const quotationSnap = await getDoc(quotationDocRef);
+      if (quotationSnap.exists() && quotationSnap.data().status === 'Booking Completed') {
+         batch.update(quotationDocRef, { status: 'Submitted', updatedAt: serverTimestamp() });
+      }
+
+      await batch.commit();
+      await loadAllData();
       setLoading(false);
-      return false;
+      return true;
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      setLoading(false);
+      throw error;
     }
-
-    setBookings(prev => prev.filter(b => b.id !== id));
-
-    // Revert related quotation status to 'Submitted'
-    setQuotations(prevQtns => prevQtns.map(q => 
-      q.id === bookingToDelete.quotationId && q.status === 'Booking Completed' 
-      ? { ...q, status: 'Submitted', updatedAt: now() } 
-      : q
-    ).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    
-    setLoading(false);
-    return true;
-  }, [bookings]);
+  }, [loadAllData]);
 
 
-  // BuyRate Operations
+  // BuyRate Operations (still mock)
   const fetchBuyRates = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
     await simulateDelay();
@@ -313,7 +423,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(false);
     return updated;
   }, []);
-  
+
   const deleteBuyRate = useCallback(async (id: string) => {
     setLoading(true);
     await simulateDelay();
@@ -322,21 +432,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
-  // Schedule Operations
+  // Schedule Operations (still mock)
   const fetchSchedules = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
     await simulateDelay();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setLoading(false);
-    return { data: schedules.slice(start, end).sort((a,b) => new Date(b.etd).getTime() - new Date(a.etd).getTime()), total: schedules.length };
+    return { data: schedules.slice(start, end).sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()), total: schedules.length };
   }, [schedules]);
 
   const createSchedule = useCallback(async (data: Omit<Schedule, 'id'>) => {
     setLoading(true);
     await simulateDelay();
     const newSchedule: Schedule = { ...data, id: `SCH-${String(Date.now()).slice(-6)}` };
-    setSchedules(prev => [newSchedule, ...prev].sort((a,b) => new Date(b.etd).getTime() - new Date(a.etd).getTime()));
+    setSchedules(prev => [newSchedule, ...prev].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
     setLoading(false);
     return newSchedule;
   }, []);
@@ -351,7 +461,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return updated;
       }
       return s;
-    }).sort((a,b) => new Date(b.etd).getTime() - new Date(a.etd).getTime()));
+    }).sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
     setLoading(false);
     return updated;
   }, []);
@@ -364,7 +474,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
-  // ScheduleRates (for quotation/booking rate selection step)
+  // ScheduleRates (still mock)
   const searchScheduleRates = useCallback(async (params: any) => {
     setLoading(true);
     await simulateDelay();
@@ -376,7 +486,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         results = results.filter(sr => sr.destination.toLowerCase().includes(params.pod.toLowerCase()));
     }
     setLoading(false);
-    return results.slice(0, 10); 
+    return results.slice(0, 10);
   }, [scheduleRates]);
 
 
@@ -402,5 +512,3 @@ export function useData() {
   }
   return context;
 }
-
-    

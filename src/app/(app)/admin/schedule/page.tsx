@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Import parseISO
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export default function ManageSchedulesPage() {
@@ -76,11 +76,12 @@ export default function ManageSchedulesPage() {
   };
 
   const handleFormSubmit = async (data: ScheduleFormValues) => {
-    // Format dates to ISO string or desired string format for mock storage
+    // Dates from form are JS Date objects. Firestore handles them.
+    // If Schedule type expects ISO strings:
     const formattedData = {
         ...data,
-        etd: format(data.etd, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-        eta: format(data.eta, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+        etd: data.etd.toISOString(), // Convert to ISO string
+        eta: data.eta.toISOString(), // Convert to ISO string
     };
 
     if (editingSchedule) {

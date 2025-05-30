@@ -1,10 +1,11 @@
+
 "use client";
 
 import type { ColumnDef } from "@/components/common/DataTable";
 import type { Booking } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Import parseISO
 
 export const getBookingColumns = (
     onEdit: (booking: Booking) => void
@@ -60,6 +61,6 @@ export const getBookingColumns = (
   {
     accessorKey: "updatedAt",
     header: "Last Updated",
-    cell: ({ row }) => format(new Date(row.original.updatedAt), "dd MMM yyyy, HH:mm"),
+    cell: ({ row }) => format(parseISO(row.original.updatedAt), "dd MMM yyyy, HH:mm"), // Parse ISO string
   },
 ];

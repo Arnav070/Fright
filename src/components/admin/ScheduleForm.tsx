@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -35,7 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Import parseISO
 import type { Schedule, Port } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { ScrollArea } from '../ui/scroll-area';
@@ -74,8 +75,8 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
     defaultValues: initialData ? {
       ...initialData,
       allocation: Number(initialData.allocation),
-      etd: new Date(initialData.etd),
-      eta: new Date(initialData.eta),
+      etd: parseISO(initialData.etd), // Parse ISO string to Date
+      eta: parseISO(initialData.eta), // Parse ISO string to Date
     } : {
       carrier: '',
       origin: '',
@@ -83,22 +84,26 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
       serviceRoute: '',
       allocation: 0,
       frequency: undefined,
+      etd: undefined,
+      eta: undefined,
     },
   });
 
   React.useEffect(() => {
-    if (initialData) {
-      form.reset({
-        ...initialData,
-        allocation: Number(initialData.allocation),
-        etd: new Date(initialData.etd),
-        eta: new Date(initialData.eta),
-      });
-    } else {
-       form.reset({
-        carrier: '', origin: '', destination: '', serviceRoute: '', allocation: 0, 
-        etd: undefined, eta: undefined, frequency: undefined
-      });
+    if (open) { // Reset form only when dialog opens
+      if (initialData) {
+        form.reset({
+          ...initialData,
+          allocation: Number(initialData.allocation),
+          etd: parseISO(initialData.etd),
+          eta: parseISO(initialData.eta),
+        });
+      } else {
+         form.reset({
+          carrier: '', origin: '', destination: '', serviceRoute: '', allocation: 0, 
+          etd: undefined, eta: undefined, frequency: undefined
+        });
+      }
     }
   }, [initialData, form, open]);
 

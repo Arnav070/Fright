@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -35,7 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Import parseISO
 import type { BuyRate, Port } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { ScrollArea } from '../ui/scroll-area';
@@ -77,9 +78,9 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
     resolver: zodResolver(buyRateFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      rate: Number(initialData.rate), // Ensure rate is number
-      validFrom: new Date(initialData.validFrom),
-      validTo: new Date(initialData.validTo),
+      rate: Number(initialData.rate),
+      validFrom: parseISO(initialData.validFrom), // Parse string date to Date object
+      validTo: parseISO(initialData.validTo),     // Parse string date to Date object
     } : {
       carrier: '',
       pol: '',
@@ -89,22 +90,27 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
       weightCapacity: '',
       minBooking: '',
       rate: 0,
+      freightModeType: undefined,
+      validFrom: undefined,
+      validTo: undefined,
     },
   });
   
   React.useEffect(() => {
-    if (initialData) {
-      form.reset({
-        ...initialData,
-        rate: Number(initialData.rate),
-        validFrom: new Date(initialData.validFrom),
-        validTo: new Date(initialData.validTo),
-      });
-    } else {
-      form.reset({
-        carrier: '', pol: '', pod: '', commodity: '', equipment: '', freightModeType: undefined,
-        weightCapacity: '', minBooking: '', rate: 0, validFrom: undefined, validTo: undefined
-      });
+    if (open) { // Reset form only when dialog opens
+      if (initialData) {
+        form.reset({
+          ...initialData,
+          rate: Number(initialData.rate),
+          validFrom: parseISO(initialData.validFrom),
+          validTo: parseISO(initialData.validTo),
+        });
+      } else {
+        form.reset({
+          carrier: '', pol: '', pod: '', commodity: '', equipment: '', freightModeType: undefined,
+          weightCapacity: '', minBooking: '', rate: 0, validFrom: undefined, validTo: undefined
+        });
+      }
     }
   }, [initialData, form, open]);
 
@@ -114,7 +120,7 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
     await onSubmit(data);
     setIsSubmitting(false);
     if (!form.formState.errors || Object.keys(form.formState.errors).length === 0) {
-       onOpenChange(false); // Close dialog on successful submission if no errors
+       onOpenChange(false); 
     }
   };
 
