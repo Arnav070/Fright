@@ -104,7 +104,10 @@ export default function ManageSchedulesPage() {
         title="Manage Schedules"
         breadcrumbs={[{ label: 'Admin' }, { label: 'Schedules' }]}
         actions={
-          <Button onClick={handleCreateNew}>
+          <Button 
+            onClick={handleCreateNew}
+            className="bg-[#8E44AD] text-white hover:bg-[#7D3C98] focus-visible:ring-[#8E44AD]"
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Schedule
           </Button>
         }

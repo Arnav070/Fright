@@ -152,10 +152,18 @@ function AppLayoutInternal({ children, user }: { children: React.ReactNode; user
          <SidebarFooter className="p-3">
           {(open || isMobile) && (
             <div className="space-y-2">
-               <Button variant="outline" size="sm" className="w-full justify-start gap-2" asChild>
+               <Button 
+                  size="sm" 
+                  className="w-full justify-start gap-2 bg-[#8E44AD] text-white hover:bg-[#7D3C98] focus-visible:ring-[#8E44AD]" 
+                  asChild
+               >
                 <Link href="/quotations/new"><PackagePlus className="h-4 w-4" /> New Quotation</Link>
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2" asChild>
+              <Button 
+                  size="sm" 
+                  className="w-full justify-start gap-2 bg-[#8E44AD] text-white hover:bg-[#7D3C98] focus-visible:ring-[#8E44AD]" 
+                  asChild
+              >
                 <Link href="/bookings/new"><Ship className="h-4 w-4" /> New Booking</Link>
               </Button>
             </div>

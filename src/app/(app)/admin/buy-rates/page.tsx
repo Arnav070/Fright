@@ -105,7 +105,10 @@ export default function ManageBuyRatesPage() {
         title="Manage Buy Rates"
         breadcrumbs={[{ label: 'Admin' }, { label: 'Buy Rates' }]}
         actions={
-          <Button onClick={handleCreateNew}>
+          <Button 
+            onClick={handleCreateNew}
+            className="bg-[#8E44AD] text-white hover:bg-[#7D3C98] focus-visible:ring-[#8E44AD]"
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Buy Rate
           </Button>
         }

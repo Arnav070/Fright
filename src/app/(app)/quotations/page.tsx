@@ -91,7 +91,10 @@ export default function QuotationsPage() {
         breadcrumbs={[{ label: 'Quotations' }]}
         actions={
           canCreate ? (
-            <Button onClick={() => router.push('/quotations/new')}>
+            <Button 
+              onClick={() => router.push('/quotations/new')}
+              className="bg-[#8E44AD] text-white hover:bg-[#7D3C98] focus-visible:ring-[#8E44AD]"
+            >
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Quotation
             </Button>
           ) : null
