@@ -6,32 +6,45 @@ import { cn } from '@/lib/utils';
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
-  iconOnly?: boolean; 
+  iconOnly?: boolean; // Kept for interface consistency, but text is always shown
+  showText?: boolean; // Kept for interface consistency
 }
 
 export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
   const displaySizeKey = iconOnly ? 'sm' : size;
 
-  // Configuration for different logo sizes
-  // Factors are used to calculate SVG attributes based on fontSize or viewBox dimensions
   const sizeConfig = {
     sm: { 
-      width: 90, height: 20, fontSize: 16, 
-      l_dx_factor: -0.1, y_dx_factor: 0.1, y_dx_flair_spacing_factor: 0,
-      flair_rect_x_factor_of_viewbox: 0.49, flair_rect_y_factor_of_viewbox: 0.22,
-      flair_width_factor_of_fontsize: 0.25, flair_height_factor_of_fontsize: 0.10, flair_rx_factor_of_fontsize: 0.03
+      width: 90, height: 20, fontSize: 16,
+      // Kerning/spacing factors for tspans
+      l_tspan_dx_factor: -0.1, 
+      y_tspan_dx_factor: -0.05, // Adjusted to tuck 'y'
+      // Factors for the 'l' top bar path, relative to viewBox and fontSize
+      l_top_bar_x_start_factor_vb: 0.47, // Start X of bar (of viewBoxWidth)
+      l_top_bar_y_start_factor_vb: 0.22, // Top Y of bar (of viewBoxHeight)
+      l_top_bar_width_factor_fs: 0.85,    // Total width of bar (of fontSize)
+      l_top_bar_thickness_factor_fs: 0.18, // Thickness of bar (of fontSize)
+      l_top_bar_slant_factor_fs: 0.25,   // Horizontal projection of the slant (of fontSize)
     },
     md: { 
       width: 110, height: 24, fontSize: 20, 
-      l_dx_factor: -0.1, y_dx_factor: 0.1, y_dx_flair_spacing_factor: 0,
-      flair_rect_x_factor_of_viewbox: 0.49, flair_rect_y_factor_of_viewbox: 0.22,
-      flair_width_factor_of_fontsize: 0.25, flair_height_factor_of_fontsize: 0.10, flair_rx_factor_of_fontsize: 0.03
+      l_tspan_dx_factor: -0.1, 
+      y_tspan_dx_factor: -0.05,
+      l_top_bar_x_start_factor_vb: 0.47,
+      l_top_bar_y_start_factor_vb: 0.22,
+      l_top_bar_width_factor_fs: 0.85,
+      l_top_bar_thickness_factor_fs: 0.18,
+      l_top_bar_slant_factor_fs: 0.25,
     },
     lg: { 
       width: 130, height: 28, fontSize: 24, 
-      l_dx_factor: -0.1, y_dx_factor: 0.1, y_dx_flair_spacing_factor: 0,
-      flair_rect_x_factor_of_viewbox: 0.49, flair_rect_y_factor_of_viewbox: 0.22,
-      flair_width_factor_of_fontsize: 0.25, flair_height_factor_of_fontsize: 0.10, flair_rx_factor_of_fontsize: 0.03
+      l_tspan_dx_factor: -0.1, 
+      y_tspan_dx_factor: -0.05,
+      l_top_bar_x_start_factor_vb: 0.47,
+      l_top_bar_y_start_factor_vb: 0.22,
+      l_top_bar_width_factor_fs: 0.85,
+      l_top_bar_thickness_factor_fs: 0.18,
+      l_top_bar_slant_factor_fs: 0.25,
     },
   };
 
@@ -40,21 +53,34 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
   const redColor = "#D81E05";   
 
   const viewBoxWidth = 100; 
-  const viewBoxHeight = (current.fontSize / 16) * 20; 
+  const viewBoxHeight = (current.fontSize / 16) * 20; // Maintain aspect ratio based on font size
 
-  const l_dx = current.fontSize * current.l_dx_factor;
-  const y_dx_base = current.fontSize * current.y_dx_factor;
-  
-  const flairWidth = current.fontSize * current.flair_width_factor_of_fontsize;
-  const flairHeight = current.fontSize * current.flair_height_factor_of_fontsize;
-  const flairRx = current.fontSize * current.flair_rx_factor_of_fontsize;
+  // Calculate tspan dx values
+  const l_dx = current.fontSize * current.l_tspan_dx_factor;
+  const y_dx = current.fontSize * current.y_tspan_dx_factor;
 
-  // y_dx_flair_spacing_factor is 0, so y_total_dx will be same as y_dx_base
-  // This ensures 'y' is not pushed away by the flair, as flair is on top of 'l'
-  const y_total_dx = y_dx_base + (flairWidth * current.y_dx_flair_spacing_factor); 
+  // Calculate dimensions for the 'l' top bar path
+  const pathStartX = viewBoxWidth * current.l_top_bar_x_start_factor_vb;
+  const pathStartY = viewBoxHeight * current.l_top_bar_y_start_factor_vb;
+  const pathBarThickness = current.fontSize * current.l_top_bar_thickness_factor_fs;
+  const pathBarWidth = current.fontSize * current.l_top_bar_width_factor_fs;
+  const pathSlantHorizontal = current.fontSize * current.l_top_bar_slant_factor_fs;
 
-  const flairX = viewBoxWidth * current.flair_rect_x_factor_of_viewbox;
-  const flairY = viewBoxHeight * current.flair_rect_y_factor_of_viewbox;
+  // Define the SVG path for the 'l' top bar
+  // P1: Top-left of bar
+  // P2: Top-right of bar
+  // P3: Bottom-right of bar (slanted edge)
+  // P4: Bottom-left of bar
+  const p1x = pathStartX;
+  const p1y = pathStartY;
+  const p2x = pathStartX + pathBarWidth;
+  const p2y = pathStartY;
+  const p3x = pathStartX + pathBarWidth - pathSlantHorizontal;
+  const p3y = pathStartY + pathBarThickness;
+  const p4x = pathStartX;
+  const p4y = pathStartY + pathBarThickness;
+
+  const lTopBarPathData = `M ${p1x} ${p1y} L ${p2x} ${p2y} L ${p3x} ${p3y} L ${p4x} ${p4y} Z`;
   
   return (
     <Link href="/dashboard" className={cn("flex items-center hover:opacity-90", className)}>
@@ -79,16 +105,10 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
         <text x="0" y={viewBoxHeight / 2} className="cargoly-logo-svg-text">
           <tspan fill={purpleColor}>cargo</tspan>
           <tspan dx={l_dx} fill={redColor}>l</tspan>
-          <tspan dx={y_total_dx} fill={purpleColor}>y</tspan>
+          <tspan dx={y_dx} fill={purpleColor}>y</tspan>
         </text>
-        <rect
-          x={flairX}
-          y={flairY}
-          width={flairWidth}
-          height={flairHeight}
-          fill={redColor}
-          rx={flairRx}
-        />
+        {/* Path for the stylized top bar of 'l' */}
+        <path d={lTopBarPathData} fill={redColor} />
       </svg>
     </Link>
   );
