@@ -1,19 +1,17 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Nunito_Sans } from 'next/font/google'; // Changed from Geist
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { DataProvider } from '@/contexts/DataContext';
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const nunitoSans = Nunito_Sans({ // Changed from geistSans
+  variable: '--font-nunito-sans', // New variable name
   subsets: ['latin'],
+  weight: ['400', '600', '700'] // Added common weights for better typography
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+// Removed geistMono as "All fonts" implies a single family for now.
 
 export const metadata: Metadata = {
   title: 'FreightFlow',
@@ -27,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${nunitoSans.variable} antialiased`}> {/* Updated font variable */}
         <AuthProvider>
           <DataProvider>
             {children}
