@@ -25,7 +25,14 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
   const redColor = "#D81E05";
 
   // Crafted SVG string. ViewBox is 0 0 220 60.
-  // "cargo" ends around x=125. "l" stem is 130-142. Flair from 125-175. "y" starts at 155.
+  // "cargo" text starts at x=10.
+  // New "l" stem is from x=138 to x=150.
+  // New "l" flair (extending left) coordinates:
+  // Top-left (slanted): M112 12
+  // Top-right: L150 12
+  // Bottom-right: L150 24
+  // Bottom-left (straight): L100 24Z
+  // "y" text starts at x=162.
   const svgString = `
     <svg
       viewBox="0 0 220 60"
@@ -36,32 +43,22 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
         .cargoly-font {
           font-family: 'Nunito Sans', Arial, sans-serif;
           font-weight: 700; /* Bold */
-          font-size: 32px; /* Adjusted font size within viewBox */
+          font-size: 32px; /* Font size within viewBox */
           dominant-baseline: middle;
           text-anchor: start;
         }
       </style>
       <text x="10" y="30" class="cargoly-font" fill="${purpleColor}">cargo</text>
 
-      <!-- L Stem -->
-      <path d="M128 12 L128 48 L140 48 L140 12Z" fill="${redColor}" />
+      <!-- L Stem (shifted right) -->
+      <path d="M138 12 L138 48 L150 48 L150 12Z" fill="${redColor}" />
       
-      <!-- L Flair (Top Bar) -->
-      <path d="M122 12 L170 12 L158 24 L122 24Z" fill="${redColor}" />
+      <!-- L Flair (Top Bar, inverted: extends left, slant on left edge) -->
+      <path d="M112 12 L150 12 L150 24 L100 24Z" fill="${redColor}" />
       
-      <text x="152" y="30" class="cargoly-font" fill="${purpleColor}">y</text>
+      <text x="162" y="30" class="cargoly-font" fill="${purpleColor}">y</text>
     </svg>
   `;
-  // Path for L Stem: M(startX, startY) L(startX, endY) L(endX, endY) L(endX, startY) Z
-  // StartX=128, StartY=12, EndX=140 (width 12), EndY=48 (height 36)
-
-  // Path for L Flair: M(topLeftX, topLeftY) L(topRightX, topRightY) L(bottomRightX, bottomRightY) L(bottomLeftX, bottomRightY) Z
-  // TopLeftX=122 (extends left of stem), TopLeftY=12
-  // TopRightX=170 (extends far right), TopRightY=12
-  // BottomRightX=158 (inset from 170 by 12 for slant), BottomRightY=24 (thickness 12)
-  // BottomLeftX=122, BottomLeftY=24
-
-  // Text "y": starts at x=152 (tucked under flair), y=30 (vertically aligned)
 
   return (
     <Link href="/dashboard" className={cn("flex items-center hover:opacity-90", className)}>
