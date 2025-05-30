@@ -6,23 +6,21 @@ import { cn } from '@/lib/utils';
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
-  // iconOnly and showText are no longer directly used as the SVG is self-contained.
-  // The 'size' prop effectively handles different display needs.
 }
 
 export function Logo({ size = 'md', className }: LogoProps) {
-  // Aspect ratio of viewBox="0 0 250 60" is 250/60 = 4.1667
-  const aspectRatio = 250 / 60;
+  const aspectRatio = 250 / 60; // Based on the new viewBox
 
   const sizeConfig = {
-    sm: { width: 90, height: Math.round(90 / aspectRatio) },    // approx 22
-    md: { width: 120, height: Math.round(120 / aspectRatio) },  // approx 29
-    lg: { width: 150, height: Math.round(150 / aspectRatio) },  // approx 36
+    sm: { width: 90, height: Math.round(90 / aspectRatio) },
+    md: { width: 120, height: Math.round(120 / aspectRatio) },
+    lg: { width: 150, height: Math.round(150 / aspectRatio) },
   };
 
   const current = sizeConfig[size];
   const purpleColor = "#4A0E6A"; // As used for "cargo" and "y"
-  const redColor = "#D81E05";    // As used for the stylized "l"
+  const mainRedColor = "#D81E05";    // Main part of the flag/arrow
+  const foldRedColor = "#C0392B";    // Darker red for the "fold" part to give depth
 
   // SVG string crafted to match the new logo image
   const svgString = `
@@ -42,11 +40,14 @@ export function Logo({ size = 'md', className }: LogoProps) {
       </style>
       <text x="10" y="32" class="cargoly-font" fill="${purpleColor}">cargo</text>
       
-      <!-- Stylized L shape in red -->
-      <path d="M110 48 L110 12 L122 12 L122 36Z" fill="${redColor}" /> 
-      <path d="M122 12 L160 12 L170 24 L122 36Z" fill="${redColor}" />
+      {/* Folded part of the 'l' shape - a thin, slightly darker rectangle */}
+      <rect x="90" y="17" width="4" height="30" fill="${foldRedColor}" />
       
-      <text x="160" y="32" class="cargoly-font" fill="${purpleColor}">y</text>
+      {/* Main pointed part of the 'l' shape (flag/arrow) */}
+      {/* Points: top-left, bottom-left, bottom-right-base, tip, top-right-base */}
+      <polygon points="94,17 94,47 124,47 149,32 124,17" fill="${mainRedColor}" />
+      
+      <text x="154" y="32" class="cargoly-font" fill="${purpleColor}">y</text>
     </svg>
   `;
 
