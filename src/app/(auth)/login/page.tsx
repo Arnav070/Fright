@@ -77,16 +77,16 @@ export default function LoginPage() {
     <div 
       className="flex min-h-screen flex-col items-center justify-center bg-background p-4"
       style={{
-        "--primary": "346 66% 44%",
+        "--primary": "346 66% 44%", // #BB2649 HSL
         "--primary-foreground": "0 0% 100%",
-        "--ring": "346 70% 54%",
+        "--ring": "346 70% 54%", // Lighter shade of primary for ring
       } as React.CSSProperties}
     >
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
           <Logo size="lg" className="mb-4" />
-          <CardTitle className="text-3xl font-bold">Cargoly</CardTitle>
-          <CardDescription className="text-md">Streamline your freight operations</CardDescription>
+          <CardTitle className="text-3xl font-bold">Login</CardTitle>
+          <CardDescription className="text-md" style={{ color: '#4A0E6A' }}>Streamline your freight operations</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
