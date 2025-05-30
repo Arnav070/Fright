@@ -1,61 +1,35 @@
 
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  // The iconOnly and showText props are less relevant now as we use a static image.
 }
 
 export function Logo({ size = 'md', className }: LogoProps) {
-  const aspectRatio = 250 / 60; // Based on the new viewBox
-
+  // Estimated aspect ratio from the provided image is ~3:1 (width:height)
+  // Adjust these height values if your actual image's aspect ratio differs.
   const sizeConfig = {
-    sm: { width: 90, height: Math.round(90 / aspectRatio) },
-    md: { width: 120, height: Math.round(120 / aspectRatio) },
-    lg: { width: 150, height: Math.round(150 / aspectRatio) },
+    sm: { width: 90, height: 30 }, 
+    md: { width: 120, height: 40 },
+    lg: { width: 150, height: 50 },
   };
 
   const current = sizeConfig[size];
-  const purpleColor = "#4A0E6A"; // As used for "cargo" and "y"
-  const mainRedColor = "#D81E05";    // Main part of the flag/arrow
-  const foldRedColor = "#C0392B";    // Darker red for the "fold" part to give depth
-
-  // SVG string crafted to match the new logo image
-  const svgString = `
-    <svg
-      viewBox="0 0 250 60"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Cargoly Logo"
-    >
-      <style>
-        .cargoly-font {
-          font-family: 'Nunito Sans', Arial, sans-serif;
-          font-weight: 700; /* Bold */
-          font-size: 30px; /* Font size within viewBox */
-          dominant-baseline: middle;
-          text-anchor: start;
-        }
-      </style>
-      <text x="10" y="32" class="cargoly-font" fill="${purpleColor}">cargo</text>
-      
-      {/* Folded part of the 'l' shape - a thin, slightly darker rectangle */}
-      <rect x="90" y="17" width="4" height="30" fill="${foldRedColor}" />
-      
-      {/* Main pointed part of the 'l' shape (flag/arrow) */}
-      {/* Points: top-left, bottom-left, bottom-right-base, tip, top-right-base */}
-      <polygon points="94,17 94,47 124,47 149,32 124,17" fill="${mainRedColor}" />
-      
-      <text x="154" y="32" class="cargoly-font" fill="${purpleColor}">y</text>
-    </svg>
-  `;
+  const logoPath = "/cargoly-logo.png"; // This is where you should save your logo image in the 'public' folder
 
   return (
     <Link href="/dashboard" className={cn("flex items-center hover:opacity-90", className)}>
-      <div
-        style={{ width: current.width, height: current.height }}
-        dangerouslySetInnerHTML={{ __html: svgString }}
+      <Image 
+        src={logoPath}
+        alt="Cargoly Logo" 
+        width={current.width}
+        height={current.height}
+        priority // Good to add for LCP elements like a logo in the header
       />
     </Link>
   );
