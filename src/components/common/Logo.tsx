@@ -17,32 +17,32 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
     sm: { 
       width: 90, height: 20, fontSize: 16,
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.30, // Adjusted
-      l_top_bar_x_start_factor_vb: 0.45, // Adjusted
+      y_tspan_dx_factor: -0.25, 
+      l_top_bar_x_start_factor_vb: 0.45, 
       l_top_bar_y_start_factor_vb: 0.22, 
       l_top_bar_width_factor_fs: 0.90,    
       l_top_bar_thickness_factor_fs: 0.20, 
-      l_top_bar_slant_factor_fs: 0.45,   // Adjusted
+      l_top_bar_slant_factor_fs: 0.30,   
     },
     md: { 
       width: 110, height: 24, fontSize: 20, 
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.30, // Adjusted
-      l_top_bar_x_start_factor_vb: 0.45, // Adjusted
+      y_tspan_dx_factor: -0.25, 
+      l_top_bar_x_start_factor_vb: 0.45, 
       l_top_bar_y_start_factor_vb: 0.22,
       l_top_bar_width_factor_fs: 0.90,    
       l_top_bar_thickness_factor_fs: 0.20, 
-      l_top_bar_slant_factor_fs: 0.45,   // Adjusted
+      l_top_bar_slant_factor_fs: 0.30,   
     },
     lg: { 
       width: 130, height: 28, fontSize: 24, 
       l_tspan_dx_factor: -0.1, 
-      y_tspan_dx_factor: -0.30, // Adjusted
-      l_top_bar_x_start_factor_vb: 0.45, // Adjusted
+      y_tspan_dx_factor: -0.25, // Adjusted: Less aggressive tuck for 'y'
+      l_top_bar_x_start_factor_vb: 0.45, 
       l_top_bar_y_start_factor_vb: 0.22,
       l_top_bar_width_factor_fs: 0.90,    
       l_top_bar_thickness_factor_fs: 0.20, 
-      l_top_bar_slant_factor_fs: 0.45,   // Adjusted
+      l_top_bar_slant_factor_fs: 0.30,   // Adjusted: Moderate slant
     },
   };
 
