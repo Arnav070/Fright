@@ -137,7 +137,7 @@ function AppLayoutInternal({ children, user }: { children: React.ReactNode; user
     <>
       <Sidebar collapsible="icon" className="border-r">
         <SidebarHeader className="p-3">
-           <Logo size="md" iconOnly={!open && !isMobile} showText={open || isMobile} />
+           <Logo size="lg" />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
