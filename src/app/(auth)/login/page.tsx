@@ -76,6 +76,7 @@ export default function LoginPage() {
   return (
     <div
       className="flex min-h-screen flex-col items-center justify-center bg-background p-4"
+      style={{ '--primary': 'hsl(346 66% 44%)' }}
     >
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
