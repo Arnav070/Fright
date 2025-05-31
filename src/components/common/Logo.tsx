@@ -7,20 +7,21 @@ import { cn } from '@/lib/utils';
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
-  // The iconOnly and showText props are less relevant now as we use a static image.
 }
 
 export function Logo({ size = 'md', className }: LogoProps) {
-  // Estimated aspect ratio from the provided image is ~3:1 (width:height)
-  // Adjust these height values if your actual image's aspect ratio differs.
+  // Aspect ratio derived from previous attempts (approx. 250:60 or 4.16:1)
+  // sm: width 90, height 22 (90/22 = 4.09)
+  // md: width 120, height 29 (120/29 = 4.13)
+  // lg: NEW width 200, height 48 (200/48 = 4.16)
   const sizeConfig = {
-    sm: { width: 90, height: 30 }, 
-    md: { width: 120, height: 40 },
-    lg: { width: 150, height: 50 },
+    sm: { width: 90, height: 22 }, 
+    md: { width: 120, height: 29 },
+    lg: { width: 200, height: 48 }, // Increased size for 'lg'
   };
 
   const current = sizeConfig[size];
-  const logoPath = "/cargoly-logo.png"; // This is where you should save your logo image in the 'public' folder
+  const logoPath = "/cargoly-logo.png"; 
 
   return (
     <Link href="/dashboard" className={cn("flex items-center hover:opacity-90", className)}>
@@ -29,7 +30,7 @@ export function Logo({ size = 'md', className }: LogoProps) {
         alt="Cargoly Logo" 
         width={current.width}
         height={current.height}
-        priority // Good to add for LCP elements like a logo in the header
+        priority 
       />
     </Link>
   );
