@@ -67,12 +67,21 @@ export const getQuotationColumns = (
     cell: ({ row }) => {
       const status = row.original.status;
       let variant: "default" | "secondary" | "destructive" | "outline" = "default";
-      if (status === "Draft") variant = "secondary";
-      else if (status === "Submitted") variant = "outline";
-      else if (status === "Booking Completed") variant = "default"; // 'default' is often primary-like
-      else if (status === "Cancelled") variant = "destructive";
+      let customClasses = "";
+
+      if (status === "Draft") {
+        variant = "secondary"; // Base variant, will be mostly overridden
+        customClasses = "bg-[#E1D4DD] text-stone-700 border border-[#D0C0D3] hover:bg-[#d4c8d0] border-opacity-75";
+      } else if (status === "Submitted") {
+        variant = "outline";
+      } else if (status === "Booking Completed") {
+        variant = "default"; // Base for structure
+        customClasses = "bg-green-500 text-white border-transparent hover:bg-green-600";
+      } else if (status === "Cancelled") {
+        variant = "destructive";
+      }
       
-      return <Badge variant={variant} className={cn(status === "Booking Completed" && "bg-green-500 text-white")}>{status}</Badge>;
+      return <Badge variant={variant} className={cn(customClasses)}>{status}</Badge>;
     },
   },
   {
