@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -28,9 +29,9 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-primary/20 bg-primary text-primary-foreground px-4 backdrop-blur-sm md:px-6">
       {isMobile && (
-        <Button variant="outline" size="icon" className="shrink-0 md:hidden" onClick={toggleSidebar}>
+        <Button variant="outline" size="icon" className="shrink-0 md:hidden text-primary-foreground border-primary-foreground/50 hover:bg-primary-foreground/10 focus-visible:ring-primary-foreground">
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle navigation menu</span>
         </Button>
@@ -42,14 +43,14 @@ export function AppHeader() {
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-primary-foreground/10 focus-visible:ring-primary-foreground">
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name} data-ai-hint="profile avatar" />
-                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                  <AvatarFallback className="bg-primary-foreground/20 text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56"> {/* Dropdown content remains default popover styling */}
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">{user.name}</p>

@@ -74,13 +74,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div 
+    <div
       className="flex min-h-screen flex-col items-center justify-center bg-background p-4"
-      style={{
-        "--primary": "346 66% 44%", // #BB2649 HSL
-        "--primary-foreground": "0 0% 100%",
-        "--ring": "346 70% 54%", // Lighter shade of primary for ring
-      } as React.CSSProperties}
     >
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
