@@ -103,31 +103,93 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
 
   const selectedRateId = form.watch('selectedRateId');
   const selectedRate = availableRates.find(r => r.id === selectedRateId);
+  const watchedPol = form.watch('pol');
+  const watchedPod = form.watch('pod');
 
   React.useEffect(() => {
     if (selectedRate) {
       form.setValue('buyRate', selectedRate.buyRate);
-      // If sellRate was undefined, and we select a rate, we might want to clear it or pre-fill it.
-      // For now, it's left to be manually entered or potentially pre-filled.
-      // If form.getValues('sellRate') is undefined, it will remain so unless user types or another logic sets it.
-    } else {
-      // If a rate is deselected, the user might want to input manually
-      // or the fields should clear. Currently, they retain old values.
-      // Consider clearing if that's the desired UX:
-      // form.setValue('buyRate', undefined);
-      // form.setValue('sellRate', undefined);
     }
+    // Not clearing sellRate here, as it's manually entered or pre-filled from initialData
   }, [selectedRate, form]);
 
+  // Automatically fetch rates when POL, POD are set and user is on Step 2
+  React.useEffect(() => {
+    const autoFetchRates = async () => {
+      if (currentStep === 'step2' && watchedPol && watchedPod) {
+        setRatesLoading(true);
+        // Clear previous selections and rates when POL/POD change or entering step 2
+        form.setValue('selectedRateId', undefined, { shouldValidate: true });
+        form.setValue('buyRate', undefined, { shouldValidate: true });
+        form.setValue('sellRate', undefined, { shouldValidate: true });
+        setAvailableRates([]); // Clear the table
+
+        try {
+          const rates = await searchScheduleRates({ pol: watchedPol, pod: watchedPod });
+          setAvailableRates(rates);
+          if (rates.length === 0) {
+              toast({
+                  title: "No Direct Rates Found",
+                  description: `No direct schedule rates found for ${watchedPol} to ${watchedPod}. You may need to enter rates manually or check routes.`,
+                  variant: "default",
+                  duration: 5000,
+              });
+          }
+        } catch (error) {
+          console.error("Error auto-fetching rates:", error);
+          toast({
+              title: "Error Fetching Rates",
+              description: "Could not load schedule rates automatically.",
+              variant: "destructive",
+          });
+        } finally {
+          setRatesLoading(false);
+        }
+      }
+    };
+    autoFetchRates();
+  }, [watchedPol, watchedPod, currentStep, searchScheduleRates, toast, form]);
+
+
+  // Manual search rates function (for the button)
   const handleSearchRates = async () => {
-    setRatesLoading(true);
-    const pol = form.getValues('pol');
-    const pod = form.getValues('pod');
-    if (pol && pod) {
-      const rates = await searchScheduleRates({ pol, pod });
-      setAvailableRates(rates);
+    const currentPol = form.getValues('pol');
+    const currentPod = form.getValues('pod');
+    if (!currentPol || !currentPod) {
+        toast({
+            title: "POL and POD Required",
+            description: "Please select Port of Loading and Port of Discharge in Step 1 first.",
+            variant: "default"
+        });
+        setCurrentStep("step1");
+        return;
     }
-    setRatesLoading(false);
+    setRatesLoading(true);
+    form.setValue('selectedRateId', undefined, { shouldValidate: true });
+    form.setValue('buyRate', undefined, { shouldValidate: true });
+    form.setValue('sellRate', undefined, { shouldValidate: true });
+    setAvailableRates([]);
+    try {
+      const rates = await searchScheduleRates({ pol: currentPol, pod: currentPod });
+      setAvailableRates(rates);
+       if (rates.length === 0) {
+            toast({
+                title: "No Direct Rates Found",
+                description: `No direct schedule rates found for ${currentPol} to ${currentPod} after manual search.`,
+                variant: "default",
+                duration: 5000,
+            });
+        }
+    } catch (error) {
+        console.error("Error manual-fetching rates:", error);
+        toast({
+            title: "Error Fetching Rates",
+            description: "Could not load schedule rates.",
+            variant: "destructive",
+        });
+    } finally {
+      setRatesLoading(false);
+    }
   };
   
   const rateTableColumns: ColumnDef<ScheduleRate>[] = [
@@ -140,12 +202,12 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
           onCheckedChange={(checked) => {
             form.setValue('selectedRateId', checked ? row.original.id : undefined, { shouldValidate: true });
             if (checked) {
-              form.setValue('buyRate', row.original.buyRate);
-              // Potentially clear or prefill sellRate here too
-              // form.setValue('sellRate', undefined); // Example: clear sell rate to force re-entry
+              form.setValue('buyRate', row.original.buyRate, { shouldValidate: true });
+              // Clear sellRate when a new rate is selected to force re-entry or ensure it's intentional
+              form.setValue('sellRate', undefined, { shouldValidate: true }); 
             } else {
-              form.setValue('buyRate', undefined);
-              form.setValue('sellRate', undefined);
+              form.setValue('buyRate', undefined, { shouldValidate: true });
+              form.setValue('sellRate', undefined, { shouldValidate: true });
             }
           }}
         />
@@ -186,7 +248,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
         header: 'Margin',
         cell: ({ row }) => {
             const isSelected = row.original.id === selectedRateId;
-            const sellRateValue = form.watch('sellRate');
+            const sellRateValue = form.watch('sellRate'); // Watch sellRate for dynamic updates
             if (isSelected && typeof sellRateValue === 'number' && typeof row.original.buyRate === 'number') {
                 const margin = sellRateValue - row.original.buyRate;
                 return <span className={margin >= 0 ? 'text-green-600' : 'text-red-600'}>${margin.toFixed(2)}</span>;
@@ -314,9 +376,9 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
   const renderStep2 = () => (
     <div className="space-y-4">
         <div className="flex justify-end">
-            <Button type="button" onClick={handleSearchRates} disabled={ratesLoading || dataLoading}>
-                {ratesLoading || dataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                Search Rates
+            <Button type="button" onClick={handleSearchRates} disabled={ratesLoading || dataLoading || isAiGenerating}>
+                {ratesLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                Refresh / Search Rates
             </Button>
         </div>
       <DataTable columns={rateTableColumns} data={availableRates} isLoading={ratesLoading} pageSize={5} />
@@ -404,17 +466,13 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
   };
   
   const handleFormSubmit = async (data: QuotationFormValues) => {
-    // Ensure buyRate and sellRate are set if they are required by logic (e.g. status is not Draft)
-    // The Zod schema's .optional() means they can be undefined.
-    // Validation for positive numbers will only run if they are not undefined.
-    // The submit button logic might need to ensure these are present before final submission based on status.
     if (data.status !== 'Draft' && (data.buyRate === undefined || data.sellRate === undefined)) {
         toast({
             title: "Missing Rates",
             description: "Buy Rate and Sell Rate are required for non-draft quotations.",
             variant: "destructive"
         });
-        setCurrentStep("step2"); // Go back to step 2 to enter rates
+        setCurrentStep("step2"); 
         form.setError("buyRate", {type: "manual", message: "Buy rate is required."});
         form.setError("sellRate", {type: "manual", message: "Sell rate is required."});
         return;
@@ -448,31 +506,39 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             <Button type="button" onClick={() => {
               const steps = ["step1", "step2", "step3"];
               const currentIndex = steps.indexOf(currentStep);
-              // Trigger validation before moving to next step for current step's fields
               let fieldsToValidate: (keyof QuotationFormValues)[] = [];
               if (currentStep === "step1") {
                 fieldsToValidate = ["customerName", "pol", "pod", "equipment", "volume", "type", "status"];
-              } else if (currentStep === "step2") {
-                 // For step 2, validation of buyRate/sellRate might be conditional
-                 // For now, we let Zod handle it on submit or via the manual submit check
-              }
+              } 
+              // No specific validation for step2 here, main validation on submit.
+              // Or if buyRate/sellRate become non-optional based on selections, they could be added.
 
               form.trigger(fieldsToValidate.length > 0 ? fieldsToValidate : undefined).then(isValid => {
                 if(isValid) {
-                    if (currentIndex < steps.length - 1) setCurrentStep(steps[currentIndex + 1]);
+                    if (currentIndex < steps.length - 1) {
+                        // If moving to step 2, and POL/POD are not set, it won't auto-fetch.
+                        // The useEffect for auto-fetching will handle it once POL/POD are available.
+                        if (steps[currentIndex + 1] === 'step2' && (!form.getValues('pol') || !form.getValues('pod'))) {
+                             toast({
+                                title: "POL and POD Required",
+                                description: "Please select Port of Loading and Port of Discharge to see rates.",
+                                variant: "default"
+                            });
+                        }
+                        setCurrentStep(steps[currentIndex + 1]);
+                    }
                 } else {
-                    // Stay on current step if validation fails
                     toast({ title: "Validation Error", description: "Please correct the errors before proceeding.", variant: "destructive"});
                 }
               });
             }}
-            disabled={isAiGenerating}
+            disabled={isAiGenerating || ratesLoading}
             >
               Next
             </Button>
           )}
           {currentStep === "step3" && (
-            <Button type="submit" disabled={isSubmitting || initialData?.status === 'Booking Completed' || isAiGenerating}>
+            <Button type="submit" disabled={isSubmitting || initialData?.status === 'Booking Completed' || isAiGenerating || ratesLoading}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (initialData ? 'Update Quotation' : 'Submit Quotation')}
             </Button>
           )}
