@@ -75,7 +75,7 @@ interface DataContextType {
   updateSchedule: (id: string, data: Partial<Omit<Schedule, 'id'>>) => Promise<Schedule | undefined>;
   deleteSchedule: (id: string) => Promise<boolean>;
 
-  searchScheduleRates: (params: any) => Promise<ScheduleRate[]>;
+  searchScheduleRates: (params: { pol?: string; pod?: string }) => Promise<ScheduleRate[]>;
   searchQuotations: (searchTerm: string) => Promise<Quotation[]>;
 }
 
@@ -542,19 +542,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ScheduleRates (still mock)
-  const searchScheduleRates = useCallback(async (params: any) => {
+  const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string }) => {
     setLoading(true);
     await simulateDelay();
-    let results = [...scheduleRates];
-    if (params.pol) {
-        results = results.filter(sr => sr.origin.toLowerCase().includes(params.pol.toLowerCase()));
+    let results = [...scheduleRates]; // scheduleRates has origin/destination as CODES
+
+    if (params.pol) { // params.pol is a NAME (e.g., "Long Beach")
+        results = results.filter(sr => {
+            // sr.origin is a CODE (e.g., "USLGB")
+            const originPort = ports.find(p => p.code === sr.origin);
+            // Compare names: "Long Beach" (from form) with "Long Beach" (from ports matching sr.origin code)
+            return originPort && originPort.name.toLowerCase().includes(params.pol!.toLowerCase());
+        });
     }
-    if (params.pod) {
-        results = results.filter(sr => sr.destination.toLowerCase().includes(params.pod.toLowerCase()));
+    if (params.pod) { // params.pod is a NAME
+        results = results.filter(sr => {
+            const destinationPort = ports.find(p => p.code === sr.destination);
+            return destinationPort && destinationPort.name.toLowerCase().includes(params.pod!.toLowerCase());
+        });
     }
     setLoading(false);
     return results.slice(0, 10);
-  }, [scheduleRates]);
+  }, [scheduleRates, ports]); // Added ports to dependency array
 
 
   return (
@@ -579,3 +588,4 @@ export function useData() {
   }
   return context;
 }
+
