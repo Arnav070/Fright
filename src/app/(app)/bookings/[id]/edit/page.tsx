@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -42,7 +43,22 @@ export default function EditBookingPage() {
     if (!booking) return;
     setIsSubmitting(true);
     try {
-      const updatedData = await updateBooking(booking.id, data);
+      const bookingPayload: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>> = {
+        quotationId: data.selectedQuotationId, // Map selectedQuotationId to quotationId
+        customerName: data.customerName,
+        pol: data.pol,
+        pod: data.pod,
+        equipment: data.equipment,
+        volume: data.volume,
+        type: data.type,
+        sellRate: data.sellRate,
+        buyRate: data.buyRate,
+        profitAndLoss: data.profitAndLoss,
+        status: data.status,
+        notes: data.notes,
+        selectedCarrierRateId: data.selectedCarrierRateId,
+      };
+      const updatedData = await updateBooking(booking.id, bookingPayload);
       if (updatedData) {
         toast({ title: "Success", description: "Booking updated successfully." });
         router.push('/bookings');
@@ -50,6 +66,7 @@ export default function EditBookingPage() {
         toast({ title: "Error", description: "Failed to update booking.", variant: "destructive" });
       }
     } catch (error) {
+      console.error("Failed to update booking:", error);
       toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
     setIsSubmitting(false);

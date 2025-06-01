@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -15,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Booking } from '@/lib/types';
 
 export default function NewBookingPage() {
   const router = useRouter();
@@ -25,10 +27,26 @@ export default function NewBookingPage() {
 
   const handleSubmit = async (data: BookingFormValues) => {
     try {
-      const newBooking = await createBooking(data);
+      const bookingPayload: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
+        quotationId: data.selectedQuotationId, // Map selectedQuotationId to quotationId
+        customerName: data.customerName,
+        pol: data.pol,
+        pod: data.pod,
+        equipment: data.equipment,
+        volume: data.volume,
+        type: data.type,
+        sellRate: data.sellRate,
+        buyRate: data.buyRate,
+        profitAndLoss: data.profitAndLoss,
+        status: data.status,
+        notes: data.notes,
+        selectedCarrierRateId: data.selectedCarrierRateId,
+      };
+      const newBooking = await createBooking(bookingPayload);
       setSubmittedBookingId(newBooking.id);
       setShowSuccessDialog(true);
     } catch (error) {
+      console.error("Failed to create booking:", error);
       toast({
         title: "Error",
         description: "Failed to create booking. Please try again.",
