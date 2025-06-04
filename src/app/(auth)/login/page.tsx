@@ -76,13 +76,12 @@ export default function LoginPage() {
   return (
     <div
       className="flex min-h-screen flex-col items-center justify-center bg-background p-4"
-      style={{ '--primary': 'hsl(346 66% 44%)' }}
     >
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="items-center text-center">
           <Logo size="lg" className="mb-4" />
           <CardTitle className="text-3xl font-bold">Login</CardTitle>
-          <CardDescription className="text-md" style={{ color: '#4A0E6A' }}>Streamline your freight operations</CardDescription>
+          <CardDescription className="text-md" style={{ color: 'hsl(var(--heading-foreground))' }}>Streamline your freight operations</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
