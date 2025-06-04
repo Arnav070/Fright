@@ -137,7 +137,11 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isSubmitting || authLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent"
+                disabled={isSubmitting || authLoading}
+              >
                 {isSubmitting || authLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
