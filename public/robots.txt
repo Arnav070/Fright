@@ -1,0 +1,9 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Disallow specific paths if needed, for example:
+# Disallow: /admin/
+# Disallow: /private/
+
+Sitemap: [YOUR_FULL_SITEMAP_URL_HERE] # Example: https://www.yourapp.com/sitemap.xml
