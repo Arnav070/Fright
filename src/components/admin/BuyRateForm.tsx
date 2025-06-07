@@ -67,7 +67,14 @@ interface BuyRateFormProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const equipmentTypes = ["20GP", "40GP", "40HC", "20RF", "40RF", "LCL", "ULD", "Truck Load"];
+const equipmentTypes = [
+  "20ft Dry", 
+  "40ft Dry", 
+  "40ft High Cube", 
+  "20ft Reefer", 
+  "LCL", 
+  "Air Freight Unit"
+];
 const freightModeTypes: BuyRate['freightModeType'][] = ['Sea', 'Air', 'Land'];
 
 export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRateFormProps) {

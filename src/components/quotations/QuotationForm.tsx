@@ -59,7 +59,14 @@ interface QuotationFormProps {
   isSubmitting?: boolean;
 }
 
-const equipmentTypes = ["20ft Dry", "40ft Dry", "40ft High Cube", "20ft Reefer", "LCL", "Air Freight Unit"];
+const equipmentTypes = [
+  "20ft Dry", 
+  "40ft Dry", 
+  "40ft High Cube", 
+  "20ft Reefer", 
+  "LCL", 
+  "Air Freight Unit"
+];
 const quotationTypes: Quotation['type'][] = ['Import', 'Export', 'Cross-Trade'];
 const quotationStatuses: QuotationStatus[] = ['Draft', 'Submitted', 'Booking Completed', 'Cancelled'];
 
