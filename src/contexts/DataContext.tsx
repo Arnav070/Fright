@@ -39,6 +39,7 @@ import {
   writeBatch,
   where,
   limit,
+  setDoc, // Import setDoc for custom IDs
 } from 'firebase/firestore';
 
 interface DataContextType {
@@ -101,6 +102,25 @@ const toBooking = (docSnap: any): Booking => {
   } as Booking;
 };
 
+// Helper function to get the next sequential ID
+async function getNextId(collectionName: string, prefix: string): Promise<string> {
+  const collRef = collection(db, collectionName);
+  const q = query(collRef); // Consider ordering if IDs might not be purely sequential from Firestore's perspective
+  const snapshot = await getDocs(q);
+  let maxNum = 0;
+  snapshot.docs.forEach(docSnap => {
+    const id = docSnap.id;
+    if (id.startsWith(prefix)) {
+      const numPart = id.substring(prefix.length);
+      const num = parseInt(numPart, 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  });
+  return `${prefix}${maxNum + 1}`;
+}
+
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [ports, setPorts] = useState<Port[]>(mockPorts);
@@ -123,12 +143,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (quotationsSnapshot.empty) {
       console.log("Quotations collection is empty. Seeding quotations...");
       const batch = writeBatch(db);
-      const seededQuotationRefs: { [key: string]: string } = {}; // To map temp ref to Firestore ID
+      const seededQuotationRefs: { [key: string]: string } = {}; 
+      let quotationCounter = 1;
 
-      quotationsToSeedFromImage.forEach((qData, index) => {
-        const docRef = doc(quotationsRef); // Auto-generate ID
+      quotationsToSeedFromImage.forEach((qData) => {
+        const newQuotationId = `CQ-${quotationCounter}`;
         const profitAndLoss = (qData.sellRate || 0) - (qData.buyRate || 0);
-        batch.set(docRef, {
+        const quotationDocRef = doc(db, "quotations", newQuotationId);
+        batch.set(quotationDocRef, {
           ...qData,
           buyRate: qData.buyRate ?? 0,
           sellRate: qData.sellRate ?? 0,
@@ -136,24 +158,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        // Create a temporary reference key for linking bookings
         const tempRefKey = `${qData.customerName}-${qData.pol}-${qData.pod}-${qData.equipment}`;
-        seededQuotationRefs[tempRefKey] = docRef.id;
+        seededQuotationRefs[tempRefKey] = newQuotationId;
+        quotationCounter++;
       });
       await batch.commit();
-      console.log(`${quotationsToSeedFromImage.length} quotations seeded.`);
+      console.log(`${quotationsToSeedFromImage.length} quotations seeded with CQ-X format.`);
       
-      // Now seed bookings if empty
       const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1)));
       if (bookingsSnapshot.empty) {
         console.log("Bookings collection is empty. Seeding bookings...");
         const bookingsBatch = writeBatch(db);
+        let bookingCounter = 1;
         bookingsToSeedFromImageBase.forEach(bData => {
+          const newBookingId = `CB-${bookingCounter}`;
           const tempRefKey = `${bData.quotationRefCustomer}-${bData.quotationRefPol}-${bData.quotationRefPod}-${bData.quotationRefEquipment}`;
           const quotationId = seededQuotationRefs[tempRefKey];
 
           if (quotationId) {
-            const bookingDocRef = doc(bookingsRef);
+            const bookingDocRef = doc(db, "bookings", newBookingId);
             const { quotationRefCustomer, quotationRefPol, quotationRefPod, quotationRefEquipment, ...restOfBData } = bData;
             const profitAndLoss = (bData.sellRate || 0) - (bData.buyRate || 0);
             bookingsBatch.set(bookingDocRef, {
@@ -165,12 +188,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
+            bookingCounter++;
           } else {
-            console.warn(`Could not find quotation ID for booking: ${tempRefKey}`);
+            console.warn(`Could not find quotation ID for booking seed: ${tempRefKey}`);
           }
         });
         await bookingsBatch.commit();
-        console.log("Bookings seeded.");
+        console.log("Bookings seeded with CB-X format.");
       } else {
         console.log("Bookings collection not empty, skipping booking seed.");
       }
@@ -183,7 +207,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      await seedDatabaseIfEmpty(); // Attempt to seed first
+      await seedDatabaseIfEmpty(); 
 
       const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
       const quotationsSnapshot = await getDocs(quotationsQuery);
@@ -247,8 +271,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number) => {
     setLoading(true);
-    // Re-fetch from Firestore for pagination if desired, or use local for simplicity
-    // For now, uses local state after initial load + seed.
     const allQuotations = quotations.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
@@ -273,24 +295,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
     setLoading(true);
     try {
-      // Ensure buyRate and sellRate are numbers (0 if undefined) before saving
+      const newId = await getNextId("quotations", "CQ-");
       const finalBuyRate = quotationData.buyRate ?? 0;
       const finalSellRate = quotationData.sellRate ?? 0;
 
       const dataToSave = {
-        ...quotationData, // Spread original data first
-        buyRate: finalBuyRate, // Then override with sanitized values
+        ...quotationData,
+        buyRate: finalBuyRate,
         sellRate: finalSellRate,
-        profitAndLoss: finalSellRate - finalBuyRate, // Calculated from sanitized values
+        profitAndLoss: finalSellRate - finalBuyRate,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      const docRef = await addDoc(collection(db, "quotations"), dataToSave);
       
-      // Construct the newQuotation object for immediate UI update
-      // Ensure all fields match the Quotation type
+      await setDoc(doc(db, "quotations", newId), dataToSave);
+      
       const newQuotation: Quotation = {
-        id: docRef.id,
+        id: newId,
         customerName: dataToSave.customerName,
         pol: dataToSave.pol,
         pod: dataToSave.pod,
@@ -301,13 +322,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profitAndLoss: dataToSave.profitAndLoss,
         status: dataToSave.status,
         selectedRateId: dataToSave.selectedRateId,
-        createdAt: new Date().toISOString(), // Approximate for immediate UI update
-        updatedAt: new Date().toISOString(), // Approximate
+        createdAt: new Date().toISOString(), 
+        updatedAt: new Date().toISOString(), 
       };
-      if ((dataToSave as any).notes !== undefined) { // Cast to any to check notes
+      if ((dataToSave as any).notes !== undefined) { 
         (newQuotation as any).notes = (dataToSave as any).notes;
       }
-
 
       await loadAllData(); 
       setLoading(false);
@@ -332,25 +352,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updatedAt: serverTimestamp(),
       };
       
-      // Populate dataToUpdate only with defined fields from quotationData
       for (const key in quotationData) {
         if (Object.prototype.hasOwnProperty.call(quotationData, key)) {
           const value = quotationData[key as keyof typeof quotationData];
-          // Allow explicit nulls if the type supported it, but here we ensure numbers for rates
           if (value !== undefined) {
             (dataToUpdate as any)[key] = value;
           }
         }
       }
       
-      // Determine effective rates for P/L calc and to ensure they are numbers
       const effectiveBuyRate = (dataToUpdate as any).buyRate !== undefined ? (dataToUpdate as any).buyRate : currentData.buyRate;
       const effectiveSellRate = (dataToUpdate as any).sellRate !== undefined ? (dataToUpdate as any).sellRate : currentData.sellRate;
 
-      // Ensure buyRate and sellRate in dataToUpdate are numbers (defaulting to 0 if undefined)
       (dataToUpdate as any).buyRate = effectiveBuyRate ?? 0;
       (dataToUpdate as any).sellRate = effectiveSellRate ?? 0;
-      
       (dataToUpdate as any).profitAndLoss = ((dataToUpdate as any).sellRate || 0) - ((dataToUpdate as any).buyRate || 0);
       
       await updateDoc(docRef, dataToUpdate as any); 
@@ -390,7 +405,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const searchQuotations = useCallback(async (searchTerm: string) => {
     setLoading(true);
     const lowerSearchTerm = searchTerm.toLowerCase();
-    // Client-side search on already loaded quotations
     const results = quotations.filter(q =>
         q.id.toLowerCase().includes(lowerSearchTerm) ||
         q.customerName.toLowerCase().includes(lowerSearchTerm) ||
@@ -430,6 +444,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     const batch = writeBatch(db);
     try {
+      const newId = await getNextId("bookings", "CB-");
       const finalBuyRate = bookingData.buyRate ?? 0;
       const finalSellRate = bookingData.sellRate ?? 0;
 
@@ -441,7 +456,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      const bookingDocRef = doc(collection(db, "bookings")); 
+      
+      const bookingDocRef = doc(db, "bookings", newId); 
       batch.set(bookingDocRef, dataToSave);
 
       const quotationDocRef = doc(db, "quotations", bookingData.quotationId);
@@ -450,7 +466,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await batch.commit();
       
       const newBooking: Booking = {
-        id: bookingDocRef.id,
+        id: newId,
         quotationId: dataToSave.quotationId,
         customerName: dataToSave.customerName,
         pol: dataToSave.pol,
@@ -650,7 +666,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (polPort) {
             results = results.filter(sr => sr.origin === polPort.code);
         } else {
-            results = []; // No port found for the name, so no rates
+            results = []; 
         }
     }
     if (params.pod) { 
