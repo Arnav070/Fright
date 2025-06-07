@@ -36,18 +36,14 @@ const bookingFormSchema = z.object({
   pod: z.string(),
   equipment: z.string(),
   type: z.enum(['Import', 'Export', 'Cross-Trade']),
-  sellRate: z.number(), // from quotation
-  buyRate: z.number(), // this will be from the NEW rate search for booking
-  profitAndLoss: z.number(), // calculated based on quotation's sellRate and booking's buyRate
+  sellRate: z.number(), 
+  buyRate: z.number(), 
+  profitAndLoss: z.number(),
 
-  // Fields for rate selection for booking
-  selectedCarrierRateId: z.string().optional(), // ID of the rate selected for THIS booking
+  selectedCarrierRateId: z.string().optional(), 
   status: z.enum(['Booked', 'Shipped', 'Delivered', 'Cancelled']).default('Booked'),
   notes: z.string().optional(),
 }).refine(data => {
-    // Allow 0 as a valid buyRate if it's explicitly entered,
-    // but if it's 0 AND no carrier rate is selected, it might imply it wasn't set.
-    // For the purpose of the refine, if buyRate is explicitly 0, it's considered "set".
     if (!data.selectedCarrierRateId && (data.buyRate === undefined || data.buyRate === null )) {
         return false;
     }
@@ -80,11 +76,11 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: initialData ? {
-        ...initialData, // Spreads all fields from Booking type
+        ...initialData, 
         quotationIdSearch: initialData.quotationId || '',
         customerNameSearch: '',
         selectedQuotationId: initialData.quotationId,
-        notes: (initialData as any).notes || '', // notes might not be on Booking type strictly
+        notes: initialData.notes || '', 
         selectedCarrierRateId: initialData.selectedCarrierRateId || undefined,
     } : {
       quotationIdSearch: '',
@@ -108,7 +104,6 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
   const selectedCarrierRateId = form.watch('selectedCarrierRateId');
   const selectedBookingRate = availableBookingRates.find(r => r.id === selectedCarrierRateId);
 
-  // Effect to prefill form when a quotation is selected
   React.useEffect(() => {
     if (selectedQuotationId) {
       const fetchAndSetQuotation = async () => {
@@ -116,7 +111,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
 
         if (!quotationData) {
             if (initialData && initialData.quotationId === selectedQuotationId) {
-                 quotationData = { // Reconstruct a Quotation-like object for prefill
+                 quotationData = { 
                     id: initialData.quotationId,
                     customerName: initialData.customerName,
                     pol: initialData.pol,
@@ -124,9 +119,9 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
                     equipment: initialData.equipment,
                     type: initialData.type,
                     sellRate: initialData.sellRate,
-                    buyRate: initialData.buyRate,
+                    buyRate: initialData.buyRate, // This buyRate is from quotation, booking might override
                     profitAndLoss: initialData.profitAndLoss,
-                    status: 'Booking Completed', // Assuming this status if it's an existing booking
+                    status: 'Booking Completed', 
                     createdAt: initialData.createdAt,
                     updatedAt: initialData.updatedAt,
                 };
@@ -141,33 +136,26 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
           form.setValue('pod', quotationData.pod);
           form.setValue('equipment', quotationData.equipment);
           form.setValue('type', quotationData.type);
-          form.setValue('sellRate', quotationData.sellRate);
+          form.setValue('sellRate', quotationData.sellRate || 0); // Default to 0 if undefined
         }
       };
       fetchAndSetQuotation();
     }
   }, [selectedQuotationId, form, getQuotationById, searchedQuotations, initialData]);
 
-  // Effect to set buyRate for booking when a carrier rate is selected in Step 3
    React.useEffect(() => {
     if (selectedBookingRate) {
       form.setValue('buyRate', selectedBookingRate.buyRate);
       const sellRate = form.getValues('sellRate');
-      if (typeof sellRate === 'number') { // Ensure sellRate is a number
-        form.setValue('profitAndLoss', sellRate - selectedBookingRate.buyRate);
-      }
-    } else if (!selectedCarrierRateId && initialData && initialData.buyRate !== undefined) {
-      // If editing and deselecting a carrier rate, revert to initial buyRate if one existed
-      // or allow manual input to take precedence if user has typed.
+      form.setValue('profitAndLoss', sellRate - selectedBookingRate.buyRate);
     }
-  }, [selectedBookingRate, selectedCarrierRateId, form, initialData]);
+  }, [selectedBookingRate, form]);
 
 
   const handleSearchQuotations = async () => {
     setQuotationSearchLoading(true);
     const idTerm = form.getValues('quotationIdSearch');
     const nameTerm = form.getValues('customerNameSearch');
-
     const term = idTerm || nameTerm || '';
 
     if (term) {
@@ -196,6 +184,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     { accessorKey: 'customerName', header: 'Customer' },
     { accessorKey: 'pol', header: 'POL' },
     { accessorKey: 'pod', header: 'POD' },
+    { accessorKey: 'equipment', header: 'Equipment' },
     { accessorKey: 'status', header: 'Status' },
   ];
 
@@ -203,9 +192,16 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     setBookingRatesLoading(true);
     const pol = form.getValues('pol');
     const pod = form.getValues('pod');
-    if (pol && pod) {
-      const rates = await searchScheduleRates({ pol, pod });
+    const equipment = form.getValues('equipment');
+
+    if (pol && pod && equipment) {
+      const rates = await searchScheduleRates({ pol, pod, equipment });
       setAvailableBookingRates(rates);
+       if (rates.length === 0) {
+        toast({ title: "No Matching Carrier Rates", description: `No rates found for ${equipment} from ${pol} to ${pod}.`, variant: "default" });
+      }
+    } else {
+        toast({ title: "Missing Information", description: "Quotation details (POL, POD, Equipment) must be set to search rates.", variant: "default" });
     }
     setBookingRatesLoading(false);
   };
@@ -216,18 +212,18 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
       cell: ({ row }) => (
         <Checkbox
           checked={row.original.id === selectedCarrierRateId}
+          disabled={row.original.allocation < 1}
+          aria-label={row.original.allocation < 1 ? "Rate unavailable due to zero allocation" : "Select rate"}
           onCheckedChange={(checked) => {
             form.setValue('selectedCarrierRateId', checked ? row.original.id : undefined, { shouldValidate: true });
              if (checked) {
                 form.setValue('buyRate', row.original.buyRate);
                 const sellRate = form.getValues('sellRate');
-                if (typeof sellRate === 'number') form.setValue('profitAndLoss', sellRate - row.original.buyRate);
+                form.setValue('profitAndLoss', sellRate - row.original.buyRate);
             } else {
-                // When unchecking, reset buyRate to 0 to allow manual input or indicate no rate.
-                form.setValue('buyRate', 0, { shouldValidate: true });
+                form.setValue('buyRate', 0, { shouldValidate: true }); // Reset or allow manual
                 const sellRate = form.getValues('sellRate');
-                // Recalculate P&L based on potentially new (or 0) buyRate
-                if (typeof sellRate === 'number') form.setValue('profitAndLoss', sellRate - 0);
+                form.setValue('profitAndLoss', sellRate - 0);
             }
           }}
         />
@@ -236,9 +232,17 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     { accessorKey: 'carrier', header: 'Carrier' },
     { accessorKey: 'origin', header: 'Origin' },
     { accessorKey: 'destination', header: 'Destination' },
-    { accessorKey: 'voyageDetails', header: 'String' },
+    { accessorKey: 'voyageDetails', header: 'Service / Voyage / Equipment' },
     { accessorKey: 'buyRate', header: 'Buy Rate', cell: ({ row }) => `$${row.original.buyRate.toFixed(2)}`},
-    { accessorKey: 'allocation', header: 'Allocation', cell: ({ row }) => `${row.original.allocation} Units`},
+    { 
+      accessorKey: 'allocation', 
+      header: 'Allocation', 
+      cell: ({ row }) => (
+        <span className={row.original.allocation < 1 ? 'text-destructive' : ''}>
+          {row.original.allocation} Units
+        </span>
+      )
+    },
   ];
 
   const renderStep1 = () => (
@@ -281,7 +285,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
                 <p><strong>Route:</strong> {values.pol} to {values.pod}</p>
                 <p><strong>Equipment:</strong> {values.equipment}</p>
                 <p><strong>Type:</strong> {values.type}</p>
-                <p><strong>Original Sell Rate:</strong> ${typeof values.sellRate === 'number' ? values.sellRate.toFixed(2) : 'N/A'}</p>
+                <p><strong>Original Sell Rate:</strong> ${values.sellRate.toFixed(2)}</p>
             </CardContent>
         </Card>
     );
@@ -306,8 +310,13 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
                         step="0.01"
                         placeholder="Enter Buy Rate"
                         {...field}
-                        value={field.value === undefined || field.value === null ? '' : field.value} // Handle undefined for input
-                        onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                        value={field.value ?? ''} 
+                        onChange={e => {
+                            const val = parseFloat(e.target.value);
+                            field.onChange(isNaN(val) ? 0 : val);
+                            const sellRate = form.getValues('sellRate');
+                            form.setValue('profitAndLoss', sellRate - (isNaN(val) ? 0 : val));
+                        }} />
                       </FormControl>
                       <FormMessage />
                   </FormItem>
@@ -328,7 +337,7 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     const values = form.getValues();
     const finalBuyRate = values.buyRate;
     const finalSellRate = values.sellRate;
-    const finalProfitAndLoss = (typeof finalSellRate === 'number' && typeof finalBuyRate === 'number') ? finalSellRate - finalBuyRate : 0;
+    const finalProfitAndLoss = finalSellRate - finalBuyRate;
 
     return (
         <Card>
@@ -339,8 +348,8 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
                 <p><strong>Route:</strong> {values.pol} to {values.pod}</p>
                 <p><strong>Equipment:</strong> {values.equipment}</p>
                 {selectedBookingRate && <p><strong>Selected Carrier for Booking:</strong> {selectedBookingRate.carrier}</p>}
-                <p><strong>Booking Buy Rate:</strong> ${typeof finalBuyRate === 'number' ? finalBuyRate.toFixed(2) : 'N/A'}</p>
-                <p><strong>Quotation Sell Rate:</strong> ${typeof finalSellRate === 'number' ? finalSellRate.toFixed(2) : 'N/A'}</p>
+                <p><strong>Booking Buy Rate:</strong> ${finalBuyRate.toFixed(2)}</p>
+                <p><strong>Quotation Sell Rate:</strong> ${finalSellRate.toFixed(2)}</p>
                 <p><strong>Estimated P/L for Booking:</strong> <span className={finalProfitAndLoss >= 0 ? 'text-green-600' : 'text-red-600'}>${finalProfitAndLoss.toFixed(2)}</span></p>
                 <p><strong>Status:</strong> {values.status}</p>
                 {values.notes && <p><strong>Notes:</strong> {values.notes}</p>}
@@ -349,17 +358,17 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     );
   };
 
-  const handleFormSubmit = async (data: BookingFormValues) => {
+  const handleFormSubmitInternal = async (data: BookingFormValues) => {
     if (data.buyRate === undefined || data.buyRate === null) {
         data.buyRate = 0;
     }
-    const finalPL = (typeof data.sellRate === 'number' && typeof data.buyRate === 'number') ? data.sellRate - data.buyRate : 0;
+    const finalPL = data.sellRate - data.buyRate;
     await onSubmit({...data, profitAndLoss: finalPL});
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleFormSubmitInternal)} className="space-y-6">
         <Accordion type="single" value={currentStep} onValueChange={setCurrentStep} collapsible className="w-full">
           <AccordionItem value="step1">
             <AccordionTrigger className="text-lg font-semibold">Step 1: Quotation Search</AccordionTrigger>
@@ -392,6 +401,9 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
                     toast({title: "Quotation Required", description: "Please search and select a quotation.", variant:"default"});
                     return;
                 }
+                 if(currentStep === "step2") { // Moving from Step 2 to Step 3
+                    handleSearchBookingRates(); // Automatically search rates when moving to step 3
+                }
                 setCurrentStep(steps[currentIndex + 1]);
               }
             }}>
@@ -408,3 +420,4 @@ export function BookingForm({ initialData, onSubmit, onCancel, isSubmitting }: B
     </Form>
   );
 }
+

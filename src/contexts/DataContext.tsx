@@ -76,7 +76,7 @@ interface DataContextType {
   updateSchedule: (id: string, data: Partial<Omit<Schedule, 'id'>>) => Promise<Schedule | undefined>;
   deleteSchedule: (id: string) => Promise<boolean>;
 
-  searchScheduleRates: (params: { pol?: string; pod?: string }) => Promise<ScheduleRate[]>;
+  searchScheduleRates: (params: { pol?: string; pod?: string; equipment?: string; }) => Promise<ScheduleRate[]>;
   searchQuotations: (searchTerm: string) => Promise<Quotation[]>;
   clearAndReseedData: () => Promise<void>;
 }
@@ -92,16 +92,14 @@ const toQuotation = (docSnap: any): Quotation => {
     pod: data.pod,
     equipment: data.equipment,
     type: data.type,
-    buyRate: data.buyRate,
-    sellRate: data.sellRate,
+    buyRate: data.buyRate === null || data.buyRate === undefined ? undefined : data.buyRate,
+    sellRate: data.sellRate === null || data.sellRate === undefined ? undefined : data.sellRate,
     profitAndLoss: data.profitAndLoss,
     status: data.status,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
+    selectedRateId: data.selectedRateId === null ? undefined : data.selectedRateId,
   };
-  if (data.selectedRateId !== null && data.selectedRateId !== undefined) {
-    quotation.selectedRateId = data.selectedRateId;
-  }
   if (data.notes !== null && data.notes !== undefined) {
     (quotation as any).notes = data.notes;
   }
@@ -124,20 +122,15 @@ const toBooking = (docSnap: any): Booking => {
     status: data.status,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
+    selectedCarrierRateId: data.selectedCarrierRateId === null ? undefined : data.selectedCarrierRateId,
+    notes: data.notes === null ? undefined : data.notes,
   };
-  if (data.selectedCarrierRateId !== null && data.selectedCarrierRateId !== undefined) {
-    booking.selectedCarrierRateId = data.selectedCarrierRateId;
-  }
-  if (data.notes !== null && data.notes !== undefined) {
-    booking.notes = data.notes;
-  }
   return booking;
 };
 
 async function getNextId(collectionName: string, prefix: string): Promise<string> {
   const collRef = collection(db, collectionName);
-  const q = query(collRef); // In a real high-traffic app, query all docs is not efficient.
-                          // Consider orderBy('id', 'desc').limit(1) if IDs are sortable, or a counter.
+  const q = query(collRef); 
   const snapshot = await getDocs(q);
   let maxNum = 0;
   snapshot.docs.forEach(docSnap => {
@@ -155,16 +148,16 @@ async function getNextId(collectionName: string, prefix: string): Promise<string
 
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [ports, setPorts] = useState<Port[]>(mockPorts);
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [buyRates, setBuyRates] = useState<BuyRate[]>(initialMockBuyRates);
-  const [schedules, setSchedules] = useState<Schedule[]>(initialMockSchedules);
-  const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(staticMockScheduleRates);
-  const [loading, setLoading] = useState(true);
+  const [portsData, setPortsData] = useState<Port[]>(mockPorts);
+  const [quotationsData, setQuotationsData] = useState<Quotation[]>([]);
+  const [bookingsData, setBookingsData] = useState<Booking[]>([]);
+  const [buyRatesData, setBuyRatesData] = useState<BuyRate[]>(initialMockBuyRates);
+  const [schedulesData, setSchedulesData] = useState<Schedule[]>(initialMockSchedules);
+  const [scheduleRatesData, setScheduleRatesData] = useState<ScheduleRate[]>(staticMockScheduleRates);
+  const [appLoading, setAppLoading] = useState(true);
 
-  const [quotationStatusSummary, setQuotationStatusSummary] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
-  const [bookingsByMonth, setBookingsByMonth] = useState<BookingsByMonthEntry[]>([]);
+  const [quotationStatusSummaryData, setQuotationStatusSummaryData] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
+  const [bookingsByMonthData, setBookingsByMonthData] = useState<BookingsByMonthEntry[]>([]);
 
   const seedDatabaseIfEmpty = useCallback(async () => {
     console.log("Checking if database needs seeding...");
@@ -176,7 +169,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.log("Quotations collection is empty. Seeding quotations...");
       const batch = writeBatch(db);
       const seededQuotationRefs: { [key: string]: string } = {};
-      let quotationCounter = 0; // Start from 0 to get ID CQ-1 first
+      let quotationCounter = 0; 
 
       for (const qData of quotationsToSeedFromImage) {
         quotationCounter++;
@@ -185,8 +178,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         
         const quotationToSave: any = {
           ...qData,
-          buyRate: qData.buyRate ?? 0,
-          sellRate: qData.sellRate ?? 0,
+          buyRate: qData.buyRate === undefined ? null : qData.buyRate,
+          sellRate: qData.sellRate === undefined ? null : qData.sellRate,
           profitAndLoss,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -206,7 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (bookingsSnapshot.empty) {
         console.log("Bookings collection is empty. Seeding bookings...");
         const bookingsBatch = writeBatch(db);
-        let bookingCounter = 0; // Start from 0 to get ID CB-1 first
+        let bookingCounter = 0; 
         for (const bData of bookingsToSeedFromImageBase) {
           bookingCounter++;
           const newBookingId = `CB-${bookingCounter}`;
@@ -247,24 +240,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
 
   const loadAllData = useCallback(async () => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       await seedDatabaseIfEmpty();
 
       const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
       const quotationsSnapshot = await getDocs(quotationsQuery);
       const fetchedQuotations = quotationsSnapshot.docs.map(toQuotation);
-      setQuotations(fetchedQuotations);
+      setQuotationsData(fetchedQuotations);
 
       const bookingsQuery = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
       const bookingsSnapshot = await getDocs(bookingsQuery);
       const fetchedBookings = bookingsSnapshot.docs.map(toBooking);
-      setBookings(fetchedBookings);
+      setBookingsData(fetchedBookings);
 
     } catch (error) {
       console.error("Error during data loading or seeding:", error);
     }
-    setLoading(false);
+    setAppLoading(false);
   }, [seedDatabaseIfEmpty]);
 
   useEffect(() => {
@@ -272,7 +265,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [loadAllData]);
 
   const clearAndReseedData = async () => {
-    setLoading(true);
+    setAppLoading(true);
     console.log("Attempting to clear and re-seed all Quotation and Booking data...");
     const BATCH_SIZE = 499;
 
@@ -293,7 +286,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           await quotationDeleteBatch.commit();
       }
       console.log(`${qDeleteCount} quotations deleted.`);
-      setQuotations([]);
+      setQuotationsData([]);
 
       const bookingsRef = collection(db, "bookings");
       const bSnapshot = await getDocs(bookingsRef);
@@ -311,29 +304,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
           await bookingDeleteBatch.commit();
       }
       console.log(`${bDeleteCount} bookings deleted.`);
-      setBookings([]);
+      setBookingsData([]);
 
-      await loadAllData();
+      await loadAllData(); // This will re-trigger seeding
       console.log("Data cleared and re-seeded successfully.");
     } catch (error) {
       console.error("Error during clear and re-seed:", error);
-      await loadAllData(); // Try to reload data even if clear/re-seed failed partially
+      await loadAllData(); 
     } finally {
-      setLoading(false);
+      setAppLoading(false);
     }
   };
 
 
   useEffect(() => {
     const summary: QuotationStatusSummary = { draft: 0, submitted: 0, completed: 0, cancelled: 0 };
-    quotations.forEach(q => {
+    quotationsData.forEach(q => {
       if (q.status === 'Draft') summary.draft++;
       else if (q.status === 'Submitted') summary.submitted++;
       else if (q.status === 'Booking Completed') summary.completed++;
       else if (q.status === 'Cancelled') summary.cancelled++;
     });
-    setQuotationStatusSummary(summary);
-  }, [quotations]);
+    setQuotationStatusSummaryData(summary);
+  }, [quotationsData]);
 
   useEffect(() => {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -341,7 +334,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const today = new Date();
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
-    bookings.forEach(b => {
+    bookingsData.forEach(b => {
       const bookingDate = parseISO(b.createdAt);
       if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
           const monthName = monthNames[bookingDate.getMonth()];
@@ -359,86 +352,78 @@ export function DataProvider({ children }: { children: ReactNode }) {
         count: countsByMonth[monthName] || 0
       });
     }
-    setBookingsByMonth(result);
-  }, [bookings]);
+    setBookingsByMonthData(result);
+  }, [bookingsData]);
 
   // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number) => {
-    setLoading(true);
-    const allQuotations = quotations.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
+    setAppLoading(true);
+    const allQuotations = quotationsData.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    setLoading(false);
+    setAppLoading(false);
     return { data: allQuotations.slice(start, end), total: allQuotations.length };
-  }, [quotations]);
+  }, [quotationsData]);
 
   const getQuotationById = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       const docRef = doc(db, "quotations", id);
       const docSnap = await getDoc(docRef);
-      setLoading(false);
+      setAppLoading(false);
       return docSnap.exists() ? toQuotation(docSnap) : undefined;
     } catch (error) {
       console.error("Error fetching quotation by ID:", error);
-      setLoading(false);
+      setAppLoading(false);
       return undefined;
     }
   }, []);
 
   const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       const newId = await getNextId("quotations", "CQ-");
-      const finalBuyRate = quotationData.buyRate ?? 0;
-      const finalSellRate = quotationData.sellRate ?? 0;
+      const finalBuyRate = quotationData.buyRate; // Keep as potentially undefined
+      const finalSellRate = quotationData.sellRate; // Keep as potentially undefined
 
       const dataToSave: any = {
         ...quotationData,
-        buyRate: finalBuyRate,
-        sellRate: finalSellRate,
-        profitAndLoss: finalSellRate - finalBuyRate,
+        buyRate: finalBuyRate === undefined ? null : finalBuyRate,
+        sellRate: finalSellRate === undefined ? null : finalSellRate,
+        profitAndLoss: (finalSellRate || 0) - (finalBuyRate || 0),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        selectedRateId: quotationData.selectedRateId === undefined ? null : quotationData.selectedRateId,
+        notes: quotationData.notes === undefined ? null : (quotationData as any).notes,
       };
-      if (dataToSave.selectedRateId === undefined) dataToSave.selectedRateId = null;
-      if (dataToSave.notes === undefined) dataToSave.notes = null;
-
-
+      
       await setDoc(doc(db, "quotations", newId), dataToSave);
 
       const newQuotation: Quotation = {
         id: newId,
-        customerName: quotationData.customerName,
-        pol: quotationData.pol,
-        pod: quotationData.pod,
-        equipment: quotationData.equipment,
-        type: quotationData.type,
-        buyRate: dataToSave.buyRate,
-        sellRate: dataToSave.sellRate,
+        ...quotationData,
+        buyRate: finalBuyRate, // Keep as undefined if it was
+        sellRate: finalSellRate, // Keep as undefined if it was
         profitAndLoss: dataToSave.profitAndLoss,
-        status: quotationData.status,
-        selectedRateId: quotationData.selectedRateId, // Keep as undefined if it was
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-       if (quotationData.notes !== undefined) {
-        (newQuotation as any).notes = quotationData.notes;
+       if ((quotationData as any).notes !== undefined) {
+        (newQuotation as any).notes = (quotationData as any).notes;
       }
 
-
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return newQuotation;
     } catch (error) {
       console.error("Error creating quotation:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
 
   const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       const docRef = doc(db, "quotations", id);
       const currentDocSnap = await getDoc(docRef);
@@ -446,138 +431,125 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const currentData = toQuotation(currentDocSnap);
 
-      const dataToUpdate: any = { // Use 'any' for flexibility before saving
+      const dataToUpdate: any = { 
         updatedAt: serverTimestamp(),
       };
 
-      // Merge provided data, handling optional fields
       for (const key in quotationData) {
         if (Object.prototype.hasOwnProperty.call(quotationData, key)) {
-          const value = quotationData[key as keyof typeof quotationData];
-            (dataToUpdate as any)[key] = value;
+          const value = (quotationData as any)[key];
+          (dataToUpdate as any)[key] = value === undefined ? null : value;
         }
       }
       
-      if (dataToUpdate.selectedRateId === undefined && quotationData.hasOwnProperty('selectedRateId')) dataToUpdate.selectedRateId = null;
-      if (dataToUpdate.notes === undefined && quotationData.hasOwnProperty('notes')) dataToUpdate.notes = null;
+      const effectiveBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : currentData.buyRate;
+      const effectiveSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : currentData.sellRate;
 
-
-      const effectiveBuyRate = dataToUpdate.buyRate !== undefined ? dataToUpdate.buyRate : currentData.buyRate;
-      const effectiveSellRate = dataToUpdate.sellRate !== undefined ? dataToUpdate.sellRate : currentData.sellRate;
-
-      dataToUpdate.buyRate = effectiveBuyRate ?? 0;
-      dataToUpdate.sellRate = effectiveSellRate ?? 0;
-      dataToUpdate.profitAndLoss = (dataToUpdate.sellRate || 0) - (dataToUpdate.buyRate || 0);
+      dataToUpdate.buyRate = effectiveBuyRate === undefined ? null : effectiveBuyRate;
+      dataToUpdate.sellRate = effectiveSellRate === undefined ? null : effectiveSellRate;
+      dataToUpdate.profitAndLoss = (effectiveSellRate || 0) - (effectiveBuyRate || 0);
 
       await updateDoc(docRef, dataToUpdate);
 
-      // Construct the returned object carefully to match the Booking type (undefined for optionals)
       const updatedQuotationReturn: Quotation = {
-        ...currentData, // Start with current data
-        ...quotationData, // Override with provided data
-        id, // Ensure ID is correct
-        profitAndLoss: dataToUpdate.profitAndLoss, // Use calculated P/L
-        buyRate: dataToUpdate.buyRate,
-        sellRate: dataToUpdate.sellRate,
-        updatedAt: new Date().toISOString(), // Set new update timestamp
+        ...currentData, 
+        ...quotationData, 
+        id, 
+        profitAndLoss: dataToUpdate.profitAndLoss, 
+        buyRate: effectiveBuyRate, 
+        sellRate: effectiveSellRate, 
+        updatedAt: new Date().toISOString(), 
       };
-      // Ensure optional fields are undefined if they were made null for Firestore
       if (dataToUpdate.selectedRateId === null) updatedQuotationReturn.selectedRateId = undefined;
       if (dataToUpdate.notes === null) (updatedQuotationReturn as any).notes = undefined;
 
 
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return updatedQuotationReturn;
     } catch (error) {
       console.error("Error updating quotation:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
 
   const deleteQuotation = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       const qtnDocRef = doc(db, "quotations", id);
       const qtnSnap = await getDoc(qtnDocRef);
       if (qtnSnap.exists() && qtnSnap.data().status === 'Booking Completed') {
-        setLoading(false);
+        setAppLoading(false);
         return false;
       }
       await deleteDoc(qtnDocRef);
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return true;
     } catch (error) {
       console.error("Error deleting quotation:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
 
   const searchQuotations = useCallback(async (searchTerm: string) => {
-    setLoading(true);
+    setAppLoading(true);
     const lowerSearchTerm = searchTerm.toLowerCase();
-    const results = quotations.filter(q =>
+    const results = quotationsData.filter(q =>
         q.id.toLowerCase().includes(lowerSearchTerm) ||
         q.customerName.toLowerCase().includes(lowerSearchTerm) ||
         q.pol.toLowerCase().includes(lowerSearchTerm) ||
         q.pod.toLowerCase().includes(lowerSearchTerm)
     );
-    setLoading(false);
+    setAppLoading(false);
     return results;
-  }, [quotations]);
+  }, [quotationsData]);
 
 
   // Booking Operations
   const fetchBookings = useCallback(async (page: number, pageSize: number) => {
-    setLoading(true);
-     const allBookings = bookings.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
+    setAppLoading(true);
+     const allBookings = bookingsData.sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    setLoading(false);
+    setAppLoading(false);
     return { data: allBookings.slice(start, end), total: allBookings.length };
-  }, [bookings]);
+  }, [bookingsData]);
 
    const getBookingById = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
      try {
       const docRef = doc(db, "bookings", id);
       const docSnap = await getDoc(docRef);
-      setLoading(false);
+      setAppLoading(false);
       return docSnap.exists() ? toBooking(docSnap) : undefined;
     } catch (error) {
       console.error("Error fetching booking by ID:", error);
-      setLoading(false);
+      setAppLoading(false);
       return undefined;
     }
   }, []);
 
   const createBooking = useCallback(async (bookingData: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>) => {
-    setLoading(true);
+    setAppLoading(true);
     const batch = writeBatch(db);
     try {
       const newId = await getNextId("bookings", "CB-");
       const finalBuyRate = bookingData.buyRate ?? 0;
       const finalSellRate = bookingData.sellRate ?? 0;
 
-      const dataToSave: any = { // Use any for flexibility before saving to Firestore
+      const dataToSave: any = { 
         ...bookingData,
         buyRate: finalBuyRate,
         sellRate: finalSellRate,
         profitAndLoss: finalSellRate - finalBuyRate,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        selectedCarrierRateId: bookingData.selectedCarrierRateId === undefined ? null : bookingData.selectedCarrierRateId,
+        notes: bookingData.notes === undefined ? null : bookingData.notes,
       };
-
-      // Convert undefined optional fields to null for Firestore
-      if (dataToSave.selectedCarrierRateId === undefined) {
-        dataToSave.selectedCarrierRateId = null;
-      }
-      if (dataToSave.notes === undefined) {
-        dataToSave.notes = null;
-      }
 
       const bookingDocRef = doc(db, "bookings", newId);
       batch.set(bookingDocRef, dataToSave);
@@ -587,67 +559,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       await batch.commit();
 
-      // Construct the returned object to match the Booking type (undefined for optionals)
       const newBooking: Booking = {
         id: newId,
-        quotationId: bookingData.quotationId,
-        customerName: bookingData.customerName,
-        pol: bookingData.pol,
-        pod: bookingData.pod,
-        equipment: bookingData.equipment,
-        type: bookingData.type,
-        buyRate: dataToSave.buyRate, // Use the potentially defaulted value
-        sellRate: dataToSave.sellRate, // Use the potentially defaulted value
+        ...bookingData,
+        buyRate: dataToSave.buyRate, 
+        sellRate: dataToSave.sellRate, 
         profitAndLoss: dataToSave.profitAndLoss,
-        status: bookingData.status,
-        selectedCarrierRateId: bookingData.selectedCarrierRateId, // Original form value (string | undefined)
-        notes: bookingData.notes, // Original form value (string | undefined)
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return newBooking;
     } catch (error) {
       console.error("Error creating booking:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
 
   const updateBooking = useCallback(async (id: string, bookingData: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    setLoading(true);
+    setAppLoading(true);
     try {
       const docRef = doc(db, "bookings", id);
       const currentDocSnap = await getDoc(docRef);
       if (!currentDocSnap.exists()) throw new Error("Booking not found for update");
-      const currentData = toBooking(currentDocSnap); // This already converts nulls to undefined
+      const currentData = toBooking(currentDocSnap); 
 
-      const dataToUpdate: any = { // Use 'any' for flexibility before saving
+      const dataToUpdate: any = { 
           updatedAt: serverTimestamp(),
       };
       
-      // Merge provided data, handling optional fields
       for (const key in bookingData) {
         if (Object.prototype.hasOwnProperty.call(bookingData, key)) {
-          const value = bookingData[key as keyof typeof bookingData];
-            (dataToUpdate as any)[key] = value;
+          const value = (bookingData as any)[key];
+           (dataToUpdate as any)[key] = value === undefined ? null : value;
         }
       }
 
-      // Convert undefined optional fields to null for Firestore
-      // Check if the property exists in bookingData to distinguish between not provided and explicitly undefined
-      if (bookingData.hasOwnProperty('selectedCarrierRateId') && dataToUpdate.selectedCarrierRateId === undefined) {
-        dataToUpdate.selectedCarrierRateId = null;
-      }
-      if (bookingData.hasOwnProperty('notes') && dataToUpdate.notes === undefined) {
-        dataToUpdate.notes = null;
-      }
-
-
-      const effectiveBuyRate = dataToUpdate.buyRate !== undefined ? dataToUpdate.buyRate : currentData.buyRate;
-      const effectiveSellRate = dataToUpdate.sellRate !== undefined ? dataToUpdate.sellRate : currentData.sellRate;
+      const effectiveBuyRate = bookingData.buyRate !== undefined ? bookingData.buyRate : currentData.buyRate;
+      const effectiveSellRate = bookingData.sellRate !== undefined ? bookingData.sellRate : currentData.sellRate;
 
       dataToUpdate.buyRate = effectiveBuyRate ?? 0;
       dataToUpdate.sellRate = effectiveSellRate ?? 0;
@@ -655,38 +607,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       await updateDoc(docRef, dataToUpdate);
 
-      // Construct the returned object carefully to match the Booking type (undefined for optionals)
       const updatedBookingReturn: Booking = {
-        ...currentData, // Start with current data (which has undefined for optionals)
-        ...bookingData, // Override with provided data (which also has undefined for optionals)
-        id, // Ensure ID is correct
-        profitAndLoss: dataToUpdate.profitAndLoss, // Use calculated P/L
+        ...currentData, 
+        ...bookingData, 
+        id, 
+        profitAndLoss: dataToUpdate.profitAndLoss, 
         buyRate: dataToUpdate.buyRate,
         sellRate: dataToUpdate.sellRate,
-        updatedAt: new Date().toISOString(), // Set new update timestamp
+        updatedAt: new Date().toISOString(), 
       };
-      // Ensure optional fields that might have been `null` in dataToUpdate (for Firestore) are `undefined` in the return object if that's the app type.
-      // This is implicitly handled by `...bookingData` if its types are `string | undefined` for these fields.
-
+      
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return updatedBookingReturn;
     } catch (error) {
       console.error("Error updating booking:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
 
   const deleteBooking = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
     const batch = writeBatch(db);
     try {
       const bookingDocRef = doc(db, "bookings", id);
       const bookingSnap = await getDoc(bookingDocRef);
 
       if (!bookingSnap.exists()) {
-        setLoading(false);
+        setAppLoading(false);
         return false;
       }
       const bookingToDelete = toBooking(bookingSnap);
@@ -700,11 +649,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       await batch.commit();
       await loadAllData();
-      setLoading(false);
+      setAppLoading(false);
       return true;
     } catch (error) {
       console.error("Error deleting booking:", error);
-      setLoading(false);
+      setAppLoading(false);
       throw error;
     }
   }, [loadAllData]);
@@ -712,121 +661,132 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // BuyRate Operations (still mock)
   const fetchBuyRates = useCallback(async (page: number, pageSize: number) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const sortedBuyRates = [...buyRates].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime());
-    setLoading(false);
+    const sortedBuyRates = [...buyRatesData].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime());
+    setAppLoading(false);
     return { data: sortedBuyRates.slice(start, end), total: sortedBuyRates.length };
-  }, [buyRates]);
+  }, [buyRatesData]);
 
   const createBuyRate = useCallback(async (data: Omit<BuyRate, 'id'>) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     const newBuyRate: BuyRate = { ...data, id: `BR-${String(Date.now()).slice(-6)}` };
-    setBuyRates(prev => [...prev, newBuyRate].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime()));
-    setLoading(false);
+    setBuyRatesData(prev => [...prev, newBuyRate].sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime()));
+    setAppLoading(false);
     return newBuyRate;
   }, []);
 
   const updateBuyRate = useCallback(async (id: string, data: Partial<Omit<BuyRate, 'id'>>) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     let updated: BuyRate | undefined;
-    setBuyRates(prev => prev.map(br => {
+    setBuyRatesData(prev => prev.map(br => {
       if (br.id === id) {
         updated = { ...br, ...data };
         return updated;
       }
       return br;
     }).sort((a,b) => parseISO(b.validTo).getTime() - parseISO(a.validTo).getTime()));
-    setLoading(false);
+    setAppLoading(false);
     return updated;
   }, []);
 
   const deleteBuyRate = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
-    setBuyRates(prev => prev.filter(br => br.id !== id));
-    setLoading(false);
+    setBuyRatesData(prev => prev.filter(br => br.id !== id));
+    setAppLoading(false);
     return true;
   }, []);
 
   // Schedule Operations (still mock)
   const fetchSchedules = useCallback(async (page: number, pageSize: number) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const sortedSchedules = [...schedules].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime());
-    setLoading(false);
+    const sortedSchedules = [...schedulesData].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime());
+    setAppLoading(false);
     return { data: sortedSchedules.slice(start, end), total: sortedSchedules.length };
-  }, [schedules]);
+  }, [schedulesData]);
 
   const createSchedule = useCallback(async (data: Omit<Schedule, 'id'>) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     const newSchedule: Schedule = { ...data, id: `SCH-${String(Date.now()).slice(-6)}` };
-    setSchedules(prev => [...prev, newSchedule].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
-    setLoading(false);
+    setSchedulesData(prev => [...prev, newSchedule].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
+    setAppLoading(false);
     return newSchedule;
   }, []);
 
   const updateSchedule = useCallback(async (id: string, data: Partial<Omit<Schedule, 'id'>>) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
     let updated: Schedule | undefined;
-    setSchedules(prev => prev.map(s => {
+    setSchedulesData(prev => prev.map(s => {
       if (s.id === id) {
         updated = { ...s, ...data };
         return updated;
       }
       return s;
     }).sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
-    setLoading(false);
+    setAppLoading(false);
     return updated;
   }, []);
 
   const deleteSchedule = useCallback(async (id: string) => {
-    setLoading(true);
+    setAppLoading(true);
     await simulateDelay();
-    setSchedules(prev => prev.filter(s => s.id !== id));
-    setLoading(false);
+    setSchedulesData(prev => prev.filter(s => s.id !== id));
+    setAppLoading(false);
     return true;
   }, []);
 
-  // ScheduleRates (still mock)
-  const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string }) => {
-    setLoading(true);
+  const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string; equipment?: string }) => {
+    setAppLoading(true);
     await simulateDelay();
-    let results = [...scheduleRates];
+    let results = [...scheduleRatesData]; // Use scheduleRatesData (renamed from state variable)
 
     if (params.pol) {
-        const polPort = ports.find(p => p.name.toLowerCase() === params.pol!.toLowerCase());
+        const polPort = portsData.find(p => p.name.toLowerCase() === params.pol!.toLowerCase());
         if (polPort) {
             results = results.filter(sr => sr.origin === polPort.code);
         } else {
-            results = [];
+            results = []; 
         }
     }
     if (params.pod) {
-        const podPort = ports.find(p => p.name.toLowerCase() === params.pod!.toLowerCase());
+        const podPort = portsData.find(p => p.name.toLowerCase() === params.pod!.toLowerCase());
         if (podPort) {
             results = results.filter(sr => sr.destination === podPort.code);
         } else {
-            results = [];
+            results = []; 
         }
     }
-    setLoading(false);
-    return results.slice(0, 10);
-  }, [scheduleRates, ports]);
+    if (params.equipment) {
+      const equipmentLower = params.equipment.toLowerCase();
+      results = results.filter(sr => sr.voyageDetails.toLowerCase().includes(equipmentLower));
+    }
+
+    setAppLoading(false);
+    return results.slice(0, 10); 
+  }, [portsData, scheduleRatesData]);
 
 
   return (
     <DataContext.Provider value={{
-      ports, quotations, bookings, buyRates, schedules, scheduleRates, loading,
-      quotationStatusSummary, bookingsByMonth,
+      ports: portsData, 
+      quotations: quotationsData, 
+      bookings: bookingsData, 
+      buyRates: buyRatesData, 
+      schedules: schedulesData, 
+      scheduleRates: scheduleRatesData, 
+      loading: appLoading,
+      quotationStatusSummary: quotationStatusSummaryData, 
+      bookingsByMonth: bookingsByMonthData,
       fetchQuotations, getQuotationById, createQuotation, updateQuotation, deleteQuotation, searchQuotations,
       fetchBookings, getBookingById, createBooking, updateBooking, deleteBooking,
       fetchBuyRates, createBuyRate, updateBuyRate, deleteBuyRate,
@@ -846,3 +806,4 @@ export function useData() {
   }
   return context;
 }
+
