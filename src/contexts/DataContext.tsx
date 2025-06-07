@@ -16,11 +16,11 @@ import type {
 import {
   initialMockBuyRates,
   initialMockSchedules,
-  mockScheduleRates as staticMockScheduleRates, 
+  mockScheduleRates as staticMockScheduleRates,
   mockPorts,
   simulateDelay,
-  quotationsToSeedFromImage, 
-  bookingsToSeedFromImageBase 
+  quotationsToSeedFromImage,
+  bookingsToSeedFromImageBase
 } from '@/lib/mockData';
 import { format, parseISO } from 'date-fns';
 import { db } from '@/lib/firebaseConfig';
@@ -39,7 +39,7 @@ import {
   writeBatch,
   where,
   limit,
-  setDoc, 
+  setDoc,
 } from 'firebase/firestore';
 
 interface DataContextType {
@@ -49,15 +49,15 @@ interface DataContextType {
   buyRates: BuyRate[];
   schedules: Schedule[];
   scheduleRates: ScheduleRate[];
-  loading: boolean; 
+  loading: boolean;
 
   quotationStatusSummary: QuotationStatusSummary;
   bookingsByMonth: BookingsByMonthEntry[];
 
   fetchQuotations: (page: number, pageSize: number) => Promise<{ data: Quotation[], total: number }>;
   getQuotationById: (id: string) => Promise<Quotation | undefined>;
-  createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss' | 'volume'>) => Promise<Quotation>;
-  updateQuotation: (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>>) => Promise<Quotation | undefined>;
+  createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => Promise<Quotation>;
+  updateQuotation: (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<Quotation | undefined>;
   deleteQuotation: (id: string) => Promise<boolean>;
 
   fetchBookings: (page: number, pageSize: number) => Promise<{ data: Booking[], total: number }>;
@@ -78,7 +78,7 @@ interface DataContextType {
 
   searchScheduleRates: (params: { pol?: string; pod?: string }) => Promise<ScheduleRate[]>;
   searchQuotations: (searchTerm: string) => Promise<Quotation[]>;
-  clearAndReseedData: () => Promise<void>; // Added new function
+  clearAndReseedData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -105,7 +105,7 @@ const toBooking = (docSnap: any): Booking => {
 
 async function getNextId(collectionName: string, prefix: string): Promise<string> {
   const collRef = collection(db, collectionName);
-  const q = query(collRef); 
+  const q = query(collRef);
   const snapshot = await getDocs(q);
   let maxNum = 0;
   snapshot.docs.forEach(docSnap => {
@@ -129,7 +129,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [buyRates, setBuyRates] = useState<BuyRate[]>(initialMockBuyRates);
   const [schedules, setSchedules] = useState<Schedule[]>(initialMockSchedules);
   const [scheduleRates, setScheduleRates] = useState<ScheduleRate[]>(staticMockScheduleRates);
-  const [loading, setLoading] = useState(true); 
+  const [loading, setLoading] = useState(true);
 
   const [quotationStatusSummary, setQuotationStatusSummary] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
   const [bookingsByMonth, setBookingsByMonth] = useState<BookingsByMonthEntry[]>([]);
@@ -143,7 +143,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (quotationsSnapshot.empty) {
       console.log("Quotations collection is empty. Seeding quotations...");
       const batch = writeBatch(db);
-      const seededQuotationRefs: { [key: string]: string } = {}; 
+      const seededQuotationRefs: { [key: string]: string } = {};
       let quotationCounter = 1;
 
       quotationsToSeedFromImage.forEach((qData) => {
@@ -164,7 +164,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       await batch.commit();
       console.log(`${quotationsToSeedFromImage.length} quotations seeded with CQ-X format.`);
-      
+
       const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1))); // Re-check bookings after quotations might have been seeded
       if (bookingsSnapshot.empty) {
         console.log("Bookings collection is empty. Seeding bookings...");
@@ -207,7 +207,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
-      await seedDatabaseIfEmpty(); 
+      await seedDatabaseIfEmpty();
 
       const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
       const quotationsSnapshot = await getDocs(quotationsQuery);
@@ -278,7 +278,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setBookings([]); // Clear local state
 
       // 3. Re-run seeding logic (loadAllData calls seedDatabaseIfEmpty)
-      await loadAllData(); 
+      await loadAllData();
 
       console.log("Data cleared and re-seeded successfully.");
     } catch (error) {
@@ -309,7 +309,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
     bookings.forEach(b => {
-      const bookingDate = parseISO(b.createdAt); 
+      const bookingDate = parseISO(b.createdAt);
       if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
           const monthName = monthNames[bookingDate.getMonth()];
           countsByMonth[monthName] = (countsByMonth[monthName] || 0) + 1;
@@ -353,7 +353,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss' | 'volume'>) => {
+  const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
     setLoading(true);
     try {
       const newId = await getNextId("quotations", "CQ-");
@@ -368,9 +368,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      
+
       await setDoc(doc(db, "quotations", newId), dataToSave);
-      
+
       const newQuotation: Quotation = {
         id: newId,
         customerName: dataToSave.customerName,
@@ -383,14 +383,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profitAndLoss: dataToSave.profitAndLoss,
         status: dataToSave.status,
         selectedRateId: dataToSave.selectedRateId,
-        createdAt: new Date().toISOString(), 
-        updatedAt: new Date().toISOString(), 
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
-      if ((dataToSave as any).notes !== undefined) { 
+      if ((dataToSave as any).notes !== undefined) {
         (newQuotation as any).notes = (dataToSave as any).notes;
       }
 
-      await loadAllData(); 
+      await loadAllData();
       setLoading(false);
       return newQuotation;
     } catch (error) {
@@ -400,19 +400,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [loadAllData]);
 
-  const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>>) => {
+  const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => {
     setLoading(true);
     try {
       const docRef = doc(db, "quotations", id);
       const currentDocSnap = await getDoc(docRef);
       if (!currentDocSnap.exists()) throw new Error("Quotation not found for update");
-      
+
       const currentData = toQuotation(currentDocSnap);
 
-      const dataToUpdate: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>> & { updatedAt: FieldValue } = {
+      const dataToUpdate: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>> & { updatedAt: FieldValue } = {
         updatedAt: serverTimestamp(),
       };
-      
+
       for (const key in quotationData) {
         if (Object.prototype.hasOwnProperty.call(quotationData, key)) {
           const value = quotationData[key as keyof typeof quotationData];
@@ -421,18 +421,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-      
+
       const effectiveBuyRate = (dataToUpdate as any).buyRate !== undefined ? (dataToUpdate as any).buyRate : currentData.buyRate;
       const effectiveSellRate = (dataToUpdate as any).sellRate !== undefined ? (dataToUpdate as any).sellRate : currentData.sellRate;
 
       (dataToUpdate as any).buyRate = effectiveBuyRate ?? 0;
       (dataToUpdate as any).sellRate = effectiveSellRate ?? 0;
       (dataToUpdate as any).profitAndLoss = ((dataToUpdate as any).sellRate || 0) - ((dataToUpdate as any).buyRate || 0);
-      
-      await updateDoc(docRef, dataToUpdate as any); 
+
+      await updateDoc(docRef, dataToUpdate as any);
 
       const updatedQuotationData = { ...currentData, ...dataToUpdate, id, updatedAt: new Date().toISOString() } as Quotation;
-      
+
       await loadAllData();
       setLoading(false);
       return updatedQuotationData;
@@ -450,7 +450,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const qtnSnap = await getDoc(qtnDocRef);
       if (qtnSnap.exists() && qtnSnap.data().status === 'Booking Completed') {
         setLoading(false);
-        return false; 
+        return false;
       }
       await deleteDoc(qtnDocRef);
       await loadAllData();
@@ -459,7 +459,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error deleting quotation:", error);
       setLoading(false);
-      throw error; 
+      throw error;
     }
   }, [loadAllData]);
 
@@ -517,22 +517,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      
-      const bookingDocRef = doc(db, "bookings", newId); 
+
+      const bookingDocRef = doc(db, "bookings", newId);
       batch.set(bookingDocRef, dataToSave);
 
       const quotationDocRef = doc(db, "quotations", bookingData.quotationId);
       batch.update(quotationDocRef, { status: 'Booking Completed', updatedAt: serverTimestamp() });
 
       await batch.commit();
-      
+
       const newBooking: Booking = {
         id: newId,
         quotationId: dataToSave.quotationId,
         customerName: dataToSave.customerName,
         pol: dataToSave.pol,
         pod: dataToSave.pod,
-        volume: dataToSave.volume,
         equipment: dataToSave.equipment,
         type: dataToSave.type,
         buyRate: dataToSave.buyRate,
@@ -544,7 +543,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       await loadAllData();
       setLoading(false);
       return newBooking;
@@ -575,7 +574,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
               }
           }
       }
-      
+
       const effectiveBuyRate = bookingData.buyRate !== undefined ? bookingData.buyRate : currentData.buyRate;
       const effectiveSellRate = bookingData.sellRate !== undefined ? bookingData.sellRate : currentData.sellRate;
 
@@ -584,7 +583,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dataToUpdate.profitAndLoss = (dataToUpdate.sellRate || 0) - (dataToUpdate.buyRate || 0);
 
       await updateDoc(docRef, dataToUpdate as any);
-      
+
       const updatedBookingData = { ...currentData, ...dataToUpdate, id, updatedAt: new Date().toISOString() } as Booking;
       await loadAllData();
       setLoading(false);
@@ -718,17 +717,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string }) => {
     setLoading(true);
     await simulateDelay();
-    let results = [...scheduleRates]; 
+    let results = [...scheduleRates];
 
-    if (params.pol) { 
+    if (params.pol) {
         const polPort = ports.find(p => p.name.toLowerCase() === params.pol!.toLowerCase());
         if (polPort) {
             results = results.filter(sr => sr.origin === polPort.code);
         } else {
-            results = []; 
+            results = [];
         }
     }
-    if (params.pod) { 
+    if (params.pod) {
         const podPort = ports.find(p => p.name.toLowerCase() === params.pod!.toLowerCase());
         if (podPort) {
             results = results.filter(sr => sr.destination === podPort.code);
@@ -738,7 +737,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
     return results.slice(0, 10);
-  }, [scheduleRates, ports]); 
+  }, [scheduleRates, ports]);
 
 
   return (
@@ -750,7 +749,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       fetchBuyRates, createBuyRate, updateBuyRate, deleteBuyRate,
       fetchSchedules, createSchedule, updateSchedule, deleteSchedule,
       searchScheduleRates,
-      clearAndReseedData, // Expose the new function
+      clearAndReseedData,
     }}>
       {children}
     </DataContext.Provider>
@@ -764,4 +763,3 @@ export function useData() {
   }
   return context;
 }
-

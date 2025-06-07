@@ -17,7 +17,7 @@ export default function EditBookingPage() {
 
   const { getBookingById, updateBooking, loading: dataLoading } = useData();
   const { toast } = useToast();
-  
+
   const [booking, setBooking] = React.useState<Booking | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -44,12 +44,11 @@ export default function EditBookingPage() {
     setIsSubmitting(true);
     try {
       const bookingPayload: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>> = {
-        quotationId: data.selectedQuotationId, // Map selectedQuotationId to quotationId
+        quotationId: data.selectedQuotationId,
         customerName: data.customerName,
         pol: data.pol,
         pod: data.pod,
         equipment: data.equipment,
-        volume: data.volume,
         type: data.type,
         sellRate: data.sellRate,
         buyRate: data.buyRate,
@@ -86,19 +85,19 @@ export default function EditBookingPage() {
   }
 
   if (!booking) {
-    return null; 
+    return null;
   }
-  
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Edit Booking ${booking.id}`}
         breadcrumbs={[{ label: 'Bookings', href: '/bookings' }, { label: 'Edit' }]}
       />
-      <BookingForm 
-        initialData={booking} 
-        onSubmit={handleSubmit} 
-        onCancel={() => router.push('/bookings')} 
+      <BookingForm
+        initialData={booking}
+        onSubmit={handleSubmit}
+        onCancel={() => router.push('/bookings')}
         isSubmitting={isSubmitting || dataLoading}
       />
     </div>

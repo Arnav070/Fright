@@ -33,7 +33,7 @@ export interface ScheduleRate {
   origin: string;
   destination: string;
   // "String" seems like a vessel/voyage string, let's call it voyageDetails
-  voyageDetails: string; 
+  voyageDetails: string;
   buyRate: number;
   allocation: number; // available capacity
   // Sell rate and margin will be calculated/entered in quotation flow
@@ -45,7 +45,6 @@ export interface Booking {
   customerName: string;
   pol: string;
   pod: string;
-  volume: string;
   equipment: string;
   type: 'Import' | 'Export' | 'Cross-Trade';
   buyRate: number; // This might be the selected rate from quotation or re-confirmed
@@ -78,7 +77,7 @@ export interface Schedule {
   origin: string; // Could be port code
   destination: string; // Could be port code
   // "String" again, let's call it serviceRoute or voyageIdentifier
-  serviceRoute: string; 
+  serviceRoute: string;
   allocation: number; // Capacity allocated for this schedule
   etd: string; // Estimated Time of Departure
   eta: string; // Estimated Time of Arrival

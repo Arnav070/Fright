@@ -28,12 +28,11 @@ export default function NewBookingPage() {
   const handleSubmit = async (data: BookingFormValues) => {
     try {
       const bookingPayload: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> = {
-        quotationId: data.selectedQuotationId, // Map selectedQuotationId to quotationId
+        quotationId: data.selectedQuotationId,
         customerName: data.customerName,
         pol: data.pol,
         pod: data.pod,
         equipment: data.equipment,
-        volume: data.volume,
         type: data.type,
         sellRate: data.sellRate,
         buyRate: data.buyRate,
@@ -66,10 +65,10 @@ export default function NewBookingPage() {
         title="Create New Booking"
         breadcrumbs={[{ label: 'Bookings', href: '/bookings' }, { label: 'New' }]}
       />
-      <BookingForm 
-        onSubmit={handleSubmit} 
+      <BookingForm
+        onSubmit={handleSubmit}
         onCancel={() => router.push('/bookings')}
-        isSubmitting={loading} 
+        isSubmitting={loading}
       />
 
       <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>

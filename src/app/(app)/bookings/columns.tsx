@@ -32,10 +32,6 @@ export const getBookingColumns = (
     header: "POD",
   },
   {
-    accessorKey: "volume",
-    header: "Volume",
-  },
-  {
     accessorKey: "equipment",
     header: "Equipment",
   },
@@ -54,7 +50,7 @@ export const getBookingColumns = (
       else if (status === "Shipped") badgeClass = "bg-yellow-500";
       else if (status === "Delivered") badgeClass = "bg-green-500";
       else if (status === "Cancelled") badgeClass = "bg-red-500";
-      
+
       return <Badge className={cn("text-white", badgeClass)}>{status}</Badge>;
     },
   },
