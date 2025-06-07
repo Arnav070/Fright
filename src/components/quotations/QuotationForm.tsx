@@ -62,7 +62,8 @@ interface QuotationFormProps {
 const equipmentTypes = [
   "20ft Dry", 
   "40ft Dry", 
-  "40ft High Cube", 
+  "40ft High Cube",
+  "LCL",
 ];
 const quotationTypes: Quotation['type'][] = ['Import', 'Export', 'Cross-Trade'];
 const quotationStatuses: QuotationStatus[] = ['Draft', 'Submitted', 'Booking Completed', 'Cancelled'];

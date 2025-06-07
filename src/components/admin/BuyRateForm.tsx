@@ -71,6 +71,7 @@ const equipmentTypes = [
   "20ft Dry", 
   "40ft Dry", 
   "40ft High Cube",
+  "LCL",
 ];
 const freightModeTypes: BuyRate['freightModeType'][] = ['Sea', 'Air', 'Land'];
 
