@@ -16,7 +16,6 @@ const GenerateQuotationSummaryInputSchema = z.object({
   pol: z.string().describe('The Port of Loading.'),
   pod: z.string().describe('The Port of Discharge.'),
   equipment: z.string().describe('The type of equipment used for shipment.'),
-  volume: z.string().describe('The volume of the shipment.'),
   type: z.enum(['Import', 'Export', 'Cross-Trade']).describe('The type of quotation (Import, Export, or Cross-Trade).'),
 });
 export type GenerateQuotationSummaryInput = z.infer<typeof GenerateQuotationSummaryInputSchema>;
@@ -41,7 +40,6 @@ Quotation Details:
 - Port of Loading (POL): {{{pol}}}
 - Port of Discharge (POD): {{{pod}}}
 - Equipment: {{{equipment}}}
-- Volume: {{{volume}}}
 - Type: {{{type}}}
 
 Generate a summary note.`,

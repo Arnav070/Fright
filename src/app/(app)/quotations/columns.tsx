@@ -28,10 +28,6 @@ export const getQuotationColumns = (
     header: "POD",
   },
   {
-    accessorKey: "volume",
-    header: "Volume",
-  },
-  {
     accessorKey: "equipment",
     header: "Equipment",
   },

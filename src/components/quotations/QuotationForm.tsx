@@ -41,7 +41,6 @@ const quotationFormSchema = z.object({
   pol: z.string().min(1, 'Port of Loading is required'),
   pod: z.string().min(1, 'Port of Discharge is required'),
   equipment: z.string().min(1, 'Equipment type is required'),
-  volume: z.string().min(1, 'Volume is required'),
   type: z.enum(['Import', 'Export', 'Cross-Trade'], { required_error: 'Type is required' }),
   status: z.enum(['Draft', 'Submitted', 'Booking Completed', 'Cancelled']).default('Draft'),
   selectedRateId: z.string().optional(),
@@ -80,7 +79,6 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
       pol: initialData.pol,
       pod: initialData.pod,
       equipment: initialData.equipment,
-      volume: initialData.volume,
       type: initialData.type,
       status: initialData.status,
       selectedRateId: initialData.selectedRateId,
@@ -92,7 +90,6 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
       pol: '',
       pod: '',
       equipment: '',
-      volume: '',
       type: 'Export',
       status: 'Draft',
       notes: '',
@@ -260,7 +257,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
 
   const handleGenerateSummary = async () => {
     const values = form.getValues();
-    const requiredFields: (keyof QuotationFormValues)[] = ['customerName', 'pol', 'pod', 'equipment', 'volume', 'type'];
+    const requiredFields: (keyof QuotationFormValues)[] = ['customerName', 'pol', 'pod', 'equipment', 'type'];
     const missingFields = requiredFields.filter(field => !values[field]);
 
     if (missingFields.length > 0) {
@@ -279,7 +276,6 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             pol: values.pol!,
             pod: values.pod!,
             equipment: values.equipment!,
-            volume: values.volume!,
             type: values.type!,
         };
         const result = await generateQuotationSummary(input);
@@ -331,8 +327,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
           </FormItem>
         )} />
       </div>
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormField control={form.control} name="equipment" render={({ field }) => (
+       <FormField control={form.control} name="equipment" render={({ field }) => (
             <FormItem>
               <FormLabel>Equipment</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
@@ -342,14 +337,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
               <FormMessage />
             </FormItem>
           )} />
-        <FormField control={form.control} name="volume" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Volume</FormLabel>
-            <FormControl><Input placeholder="e.g., 1x40HC or 20 CBM" {...field} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
        <FormField control={form.control} name="type" render={({ field }) => (
           <FormItem>
             <FormLabel>Type</FormLabel>
@@ -370,6 +358,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             <FormMessage />
           </FormItem>
         )} />
+      </div>
     </div>
   );
 
@@ -448,7 +437,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
             <CardContent className="space-y-3">
                 <p><strong>Customer:</strong> {values.customerName}</p>
                 <p><strong>Route:</strong> {values.pol} to {values.pod}</p>
-                <p><strong>Equipment:</strong> {values.equipment} / <strong>Volume:</strong> {values.volume}</p>
+                <p><strong>Equipment:</strong> {values.equipment}</p>
                 <p><strong>Type:</strong> {values.type} / <strong>Status:</strong> {values.status}</p>
                 {selectedRate && (
                     <>
@@ -508,7 +497,7 @@ export function QuotationForm({ initialData, onSubmit, onCancel, isSubmitting }:
               const currentIndex = steps.indexOf(currentStep);
               let fieldsToValidate: (keyof QuotationFormValues)[] = [];
               if (currentStep === "step1") {
-                fieldsToValidate = ["customerName", "pol", "pod", "equipment", "volume", "type", "status"];
+                fieldsToValidate = ["customerName", "pol", "pod", "equipment", "type", "status"];
               } 
               // No specific validation for step2 here, main validation on submit.
               // Or if buyRate/sellRate become non-optional based on selections, they could be added.

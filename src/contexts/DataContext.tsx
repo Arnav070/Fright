@@ -294,7 +294,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         customerName: dataToSave.customerName,
         pol: dataToSave.pol,
         pod: dataToSave.pod,
-        volume: dataToSave.volume,
         equipment: dataToSave.equipment,
         type: dataToSave.type,
         buyRate: dataToSave.buyRate,
@@ -302,12 +301,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profitAndLoss: dataToSave.profitAndLoss,
         status: dataToSave.status,
         selectedRateId: dataToSave.selectedRateId,
-        // notes: dataToSave.notes, // Assuming notes is part of quotationData and Quotation type
         createdAt: new Date().toISOString(), // Approximate for immediate UI update
         updatedAt: new Date().toISOString(), // Approximate
       };
-      if (dataToSave.notes !== undefined) {
-        (newQuotation as any).notes = dataToSave.notes;
+      if ((dataToSave as any).notes !== undefined) { // Cast to any to check notes
+        (newQuotation as any).notes = (dataToSave as any).notes;
       }
 
 
@@ -346,14 +344,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       
       // Determine effective rates for P/L calc and to ensure they are numbers
-      const effectiveBuyRate = quotationData.buyRate !== undefined ? quotationData.buyRate : currentData.buyRate;
-      const effectiveSellRate = quotationData.sellRate !== undefined ? quotationData.sellRate : currentData.sellRate;
+      const effectiveBuyRate = (dataToUpdate as any).buyRate !== undefined ? (dataToUpdate as any).buyRate : currentData.buyRate;
+      const effectiveSellRate = (dataToUpdate as any).sellRate !== undefined ? (dataToUpdate as any).sellRate : currentData.sellRate;
 
       // Ensure buyRate and sellRate in dataToUpdate are numbers (defaulting to 0 if undefined)
-      dataToUpdate.buyRate = effectiveBuyRate ?? 0;
-      dataToUpdate.sellRate = effectiveSellRate ?? 0;
+      (dataToUpdate as any).buyRate = effectiveBuyRate ?? 0;
+      (dataToUpdate as any).sellRate = effectiveSellRate ?? 0;
       
-      dataToUpdate.profitAndLoss = (dataToUpdate.sellRate || 0) - (dataToUpdate.buyRate || 0);
+      (dataToUpdate as any).profitAndLoss = ((dataToUpdate as any).sellRate || 0) - ((dataToUpdate as any).buyRate || 0);
       
       await updateDoc(docRef, dataToUpdate as any); 
 
@@ -691,5 +689,3 @@ export function useData() {
   return context;
 }
 
-
-    

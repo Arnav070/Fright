@@ -16,7 +16,6 @@ export interface Quotation {
   customerName: string;
   pol: string; // Port of Loading
   pod: string; // Port of Discharge
-  volume: string; // e.g., "20 CBM" or "1x40HC"
   equipment: string; // e.g., "40ft High Cube"
   type: 'Import' | 'Export' | 'Cross-Trade'; // Or other relevant types
   buyRate: number;
