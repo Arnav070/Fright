@@ -22,7 +22,7 @@ const BreadcrumbList = React.forwardRef<
   <ol
     ref={ref}
     className={cn(
-      "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5",
+      "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2",
       className
     )}
     {...props}
@@ -53,7 +53,14 @@ const BreadcrumbLink = React.forwardRef<
   return (
     <Comp
       ref={ref}
-      className={cn("transition-colors hover:text-foreground", className)}
+      className={cn(
+        "rounded-md px-2.5 py-1 text-sm text-foreground bg-muted/40", // Initial box style
+        "transition-all duration-200 ease-in-out",
+        "hover:bg-accent hover:text-accent-foreground hover:shadow-lg",
+        "transform hover:scale-105 active:scale-100",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        className
+      )}
       {...props}
     />
   )
@@ -70,7 +77,8 @@ const BreadcrumbPage = React.forwardRef<
     aria-disabled="true"
     aria-current="page"
     className={cn(
-      "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-primary-foreground",
+      "rounded-md bg-primary px-2.5 py-1 text-sm font-semibold text-primary-foreground shadow-md", // Prominent box with shadow
+      "transition-transform duration-200 ease-in-out", // Added for potential future animations
       className
     )}
     {...props}
@@ -86,7 +94,7 @@ const BreadcrumbSeparator = React.forwardRef<
     ref={ref}
     role="presentation"
     aria-hidden="true"
-    className={cn("[&>svg]:size-3.5", className)}
+    className={cn("[&>svg]:size-3.5 text-muted-foreground/80", className)} // Ensure separator color is consistent
     {...props}
   >
     {children ?? <ChevronRight />}
@@ -120,3 +128,4 @@ export {
   BreadcrumbSeparator,
   BreadcrumbEllipsis,
 }
+
