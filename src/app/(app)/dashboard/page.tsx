@@ -1,23 +1,34 @@
 
 "use client";
 
+import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/PageHeader";
 import Link from "next/link";
-import { PlusCircle, BarChart3, PieChart as PieChartIcon, Users, Settings, Ship, FileText } from "lucide-react";
+import { PlusCircle, BarChart3, PieChart as PieChartIcon, Users, Settings, Ship, FileText, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext"; // Import useData
-import type { QuotationStatusSummary, BookingsByMonthEntry } from "@/lib/types"; // Import types
+import { useData } from "@/contexts/DataContext"; 
+import type { QuotationStatusSummary, BookingsByMonthEntry } from "@/lib/types"; 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, XAxis, YAxis, CartesianGrid, Bar } from 'recharts';
-import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
-const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']; // Added one more for Cancelled if needed
+const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']; 
 const BAR_CHART_COLORS = ['hsl(var(--chart-1))'];
 
 function QuotationStatusPieChart({ summaryData }: { summaryData: QuotationStatusSummary | null }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   if (!mounted || !summaryData) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
 
@@ -25,7 +36,6 @@ function QuotationStatusPieChart({ summaryData }: { summaryData: QuotationStatus
     { name: 'Draft', value: summaryData.draft },
     { name: 'Submitted', value: summaryData.submitted },
     { name: 'Booking Completed', value: summaryData.completed },
-    // { name: 'Cancelled', value: summaryData.cancelled }, // Optionally include cancelled
   ];
 
   return (
@@ -44,8 +54,8 @@ function QuotationStatusPieChart({ summaryData }: { summaryData: QuotationStatus
 }
 
 function BookingsByMonthBarChart({ monthlyData }: { monthlyData: BookingsByMonthEntry[] | null }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   if (!mounted || !monthlyData) return <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />;
 
@@ -65,7 +75,21 @@ function BookingsByMonthBarChart({ monthlyData }: { monthlyData: BookingsByMonth
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { quotationStatusSummary, bookingsByMonth, loading: dataLoading } = useData(); // Get live data
+  const { quotationStatusSummary, bookingsByMonth, loading: dataLoading, clearAndReseedData } = useData(); 
+  const { toast } = useToast();
+  const [showClearDataDialog, setShowClearDataDialog] = React.useState(false);
+
+  const handleClearAndReseed = async () => {
+    setShowClearDataDialog(false); // Close dialog first
+    toast({ title: "Processing...", description: "Clearing and re-seeding data. This may take a moment." });
+    try {
+      await clearAndReseedData();
+      toast({ title: "Success!", description: "Data has been cleared and re-seeded with new IDs." });
+    } catch (error) {
+      console.error("Error during clear and re-seed:", error);
+      toast({ title: "Error", description: "Failed to clear and re-seed data. Check console.", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -153,6 +177,52 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {user?.role === 'Admin' && (
+        <Card className="mt-6 border-destructive/50">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle /> Developer Utilities</CardTitle>
+            <CardDescription>Use these actions with caution. They can lead to data loss.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              onClick={() => setShowClearDataDialog(true)}
+              disabled={dataLoading}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear & Re-seed Quotation/Booking Data
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              This will delete ALL quotations and bookings and re-populate with initial mock data using the new ID format (CQ-X, CB-X).
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={showClearDataDialog} onOpenChange={setShowClearDataDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete ALL existing quotations and bookings from the database.
+              The database will then be re-populated with the initial mock data, using the new ID formats (CQ-X, CB-X).
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearAndReseed}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Yes, Clear and Re-seed Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
+

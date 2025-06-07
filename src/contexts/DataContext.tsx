@@ -16,11 +16,11 @@ import type {
 import {
   initialMockBuyRates,
   initialMockSchedules,
-  mockScheduleRates as staticMockScheduleRates, // Renamed to avoid conflict
+  mockScheduleRates as staticMockScheduleRates, 
   mockPorts,
   simulateDelay,
-  quotationsToSeedFromImage, // Import data for seeding
-  bookingsToSeedFromImageBase // Import data for seeding
+  quotationsToSeedFromImage, 
+  bookingsToSeedFromImageBase 
 } from '@/lib/mockData';
 import { format, parseISO } from 'date-fns';
 import { db } from '@/lib/firebaseConfig';
@@ -39,7 +39,7 @@ import {
   writeBatch,
   where,
   limit,
-  setDoc, // Import setDoc for custom IDs
+  setDoc, 
 } from 'firebase/firestore';
 
 interface DataContextType {
@@ -56,8 +56,8 @@ interface DataContextType {
 
   fetchQuotations: (page: number, pageSize: number) => Promise<{ data: Quotation[], total: number }>;
   getQuotationById: (id: string) => Promise<Quotation | undefined>;
-  createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => Promise<Quotation>;
-  updateQuotation: (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<Quotation | undefined>;
+  createQuotation: (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss' | 'volume'>) => Promise<Quotation>;
+  updateQuotation: (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>>) => Promise<Quotation | undefined>;
   deleteQuotation: (id: string) => Promise<boolean>;
 
   fetchBookings: (page: number, pageSize: number) => Promise<{ data: Booking[], total: number }>;
@@ -78,6 +78,7 @@ interface DataContextType {
 
   searchScheduleRates: (params: { pol?: string; pod?: string }) => Promise<ScheduleRate[]>;
   searchQuotations: (searchTerm: string) => Promise<Quotation[]>;
+  clearAndReseedData: () => Promise<void>; // Added new function
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -102,10 +103,9 @@ const toBooking = (docSnap: any): Booking => {
   } as Booking;
 };
 
-// Helper function to get the next sequential ID
 async function getNextId(collectionName: string, prefix: string): Promise<string> {
   const collRef = collection(db, collectionName);
-  const q = query(collRef); // Consider ordering if IDs might not be purely sequential from Firestore's perspective
+  const q = query(collRef); 
   const snapshot = await getDocs(q);
   let maxNum = 0;
   snapshot.docs.forEach(docSnap => {
@@ -165,7 +165,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await batch.commit();
       console.log(`${quotationsToSeedFromImage.length} quotations seeded with CQ-X format.`);
       
-      const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1)));
+      const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1))); // Re-check bookings after quotations might have been seeded
       if (bookingsSnapshot.empty) {
         console.log("Bookings collection is empty. Seeding bookings...");
         const bookingsBatch = writeBatch(db);
@@ -228,6 +228,67 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  const clearAndReseedData = async () => {
+    setLoading(true);
+    console.log("Attempting to clear and re-seed all Quotation and Booking data...");
+    const BATCH_SIZE = 499; // Firestore batch limit is 500 operations
+
+    try {
+      // 1. Delete all quotations
+      const quotationsRef = collection(db, "quotations");
+      const qSnapshot = await getDocs(quotationsRef);
+      let quotationDeleteBatch = writeBatch(db);
+      let qDeleteCount = 0;
+      for (const docSnap of qSnapshot.docs) {
+        quotationDeleteBatch.delete(docSnap.ref);
+        qDeleteCount++;
+        if (qDeleteCount % BATCH_SIZE === 0) {
+          console.log(`Committing batch delete for quotations (batch ${Math.ceil(qDeleteCount / BATCH_SIZE)})...`);
+          await quotationDeleteBatch.commit();
+          quotationDeleteBatch = writeBatch(db); // Start a new batch
+        }
+      }
+      if (qDeleteCount % BATCH_SIZE !== 0 && qDeleteCount > 0) { // Commit any remaining deletes
+          console.log("Committing final batch delete for quotations...");
+          await quotationDeleteBatch.commit();
+      }
+      console.log(`${qDeleteCount} quotations deleted.`);
+      setQuotations([]); // Clear local state
+
+      // 2. Delete all bookings
+      const bookingsRef = collection(db, "bookings");
+      const bSnapshot = await getDocs(bookingsRef);
+      let bookingDeleteBatch = writeBatch(db);
+      let bDeleteCount = 0;
+      for (const docSnap of bSnapshot.docs) {
+        bookingDeleteBatch.delete(docSnap.ref);
+        bDeleteCount++;
+        if (bDeleteCount % BATCH_SIZE === 0) {
+          console.log(`Committing batch delete for bookings (batch ${Math.ceil(bDeleteCount / BATCH_SIZE)})...`);
+          await bookingDeleteBatch.commit();
+          bookingDeleteBatch = writeBatch(db);
+        }
+      }
+      if (bDeleteCount % BATCH_SIZE !== 0 && bDeleteCount > 0) {
+          console.log("Committing final batch delete for bookings...");
+          await bookingDeleteBatch.commit();
+      }
+      console.log(`${bDeleteCount} bookings deleted.`);
+      setBookings([]); // Clear local state
+
+      // 3. Re-run seeding logic (loadAllData calls seedDatabaseIfEmpty)
+      await loadAllData(); 
+
+      console.log("Data cleared and re-seeded successfully.");
+    } catch (error) {
+      console.error("Error during clear and re-seed:", error);
+      // Potentially try to reload data even if clear/re-seed failed partially
+      await loadAllData();
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -292,7 +353,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
+  const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss' | 'volume'>) => {
     setLoading(true);
     try {
       const newId = await getNextId("quotations", "CQ-");
@@ -339,7 +400,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [loadAllData]);
 
-  const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => {
+  const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>>) => {
     setLoading(true);
     try {
       const docRef = doc(db, "quotations", id);
@@ -348,7 +409,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       
       const currentData = toQuotation(currentDocSnap);
 
-      const dataToUpdate: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>> & { updatedAt: FieldValue } = {
+      const dataToUpdate: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'volume'>> & { updatedAt: FieldValue } = {
         updatedAt: serverTimestamp(),
       };
       
@@ -479,13 +540,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profitAndLoss: dataToSave.profitAndLoss,
         status: dataToSave.status,
         selectedCarrierRateId: dataToSave.selectedCarrierRateId,
+        notes: (dataToSave as any).notes,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      if (dataToSave.notes !== undefined) {
-        (newBooking as any).notes = dataToSave.notes;
-      }
-
+      
       await loadAllData();
       setLoading(false);
       return newBooking;
@@ -691,6 +750,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       fetchBuyRates, createBuyRate, updateBuyRate, deleteBuyRate,
       fetchSchedules, createSchedule, updateSchedule, deleteSchedule,
       searchScheduleRates,
+      clearAndReseedData, // Expose the new function
     }}>
       {children}
     </DataContext.Provider>
