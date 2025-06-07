@@ -70,10 +70,7 @@ interface BuyRateFormProps {
 const equipmentTypes = [
   "20ft Dry", 
   "40ft Dry", 
-  "40ft High Cube", 
-  "20ft Reefer", 
-  "LCL", 
-  "Air Freight Unit"
+  "40ft High Cube",
 ];
 const freightModeTypes: BuyRate['freightModeType'][] = ['Sea', 'Air', 'Land'];
 
@@ -230,3 +227,4 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
     </Dialog>
   );
 }
+

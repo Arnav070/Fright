@@ -77,9 +77,9 @@ const mapEquipmentCodeToName = (code: string): string => {
     case '20GP': return '20ft Dry';
     case '40GP': return '40ft Dry';
     case '40HC': return '40ft High Cube';
-    case '20RF': return '20ft Reefer'; // Assuming 20RF maps to 20ft Reefer
-    case 'LCL': return 'LCL';
-    default: return code; // Fallback for unknown codes
+    // Removed '20RF' as it's not in the image-derived list
+    // Removed 'LCL' as it's not in the image-derived list
+    default: return code; // Fallback for unknown codes, though ideally all codes are mapped
   }
 };
 
@@ -92,22 +92,9 @@ export const initialMockBuyRates: BuyRate[] = fclBuyRatesFromImageRaw.map((item,
   minBooking: '1 TEU',
   validFrom: formatDateShort(startOfMonth(today)),
   validTo: formatDateShort(endOfMonth(today)),
-})).concat([
-  {
-    id: `BR-LCL-001`,
-    carrier: 'N/A',
-    pol: 'CNSGH',
-    pod: 'USLGB',
-    commodity: 'GDSM',
-    freightModeType: 'Sea',
-    equipment: 'LCL',
-    weightCapacity: '1 CBM',
-    minBooking: '1 CBM',
-    rate: 50,
-    validFrom: formatDateShort(startOfMonth(today)),
-    validTo: formatDateShort(endOfMonth(today)),
-  }
-]);
+}));
+// Removed LCL entry from initialMockBuyRates
+
 
 const schedulesFromImage: Omit<Schedule, 'id' | 'etd' | 'eta' | 'frequency'>[] = [
   { carrier: 'ONEY', origin: 'INMAA', destination: 'USLGB', serviceRoute: 'O1', allocation: 5 },
@@ -160,9 +147,7 @@ initialMockSchedules.forEach((schedule) => {
   rateFound = addRateIfFound('20ft Dry', '20ftDry', total => total > 1 ? Math.floor(total / 2) : total) || rateFound;
   rateFound = addRateIfFound('40ft Dry', '40ftDry', total => total > 1 ? Math.ceil(total / 3) : total) || rateFound;
   rateFound = addRateIfFound('40ft High Cube', '40ftHC', total => total > 1 ? Math.ceil(total / 3) : total) || rateFound;
-  // Add other equipment types from your new list if they should be derived similarly, e.g., "20ft Reefer"
-  rateFound = addRateIfFound('20ft Reefer', '20ftReefer', total => total > 1 ? Math.ceil(total / 3) : total) || rateFound;
-
+  // Removed "20ft Reefer" from here as it's not in the new list
 
   if (!rateFound) { // Fallback if no specific equipment rate matched for the schedule
      mockScheduleRates.push({
@@ -177,25 +162,13 @@ initialMockSchedules.forEach((schedule) => {
   }
 });
 
-const lclBuyRateEntry = initialMockBuyRates.find(br => br.equipment === 'LCL' && br.pol === 'CNSGH' && br.pod === 'USLGB');
-if (lclBuyRateEntry) {
-    mockScheduleRates.push({
-        id: `SRATE-LCL-CNSGH-USLGB-001`,
-        carrier: lclBuyRateEntry.carrier,
-        origin: 'CNSGH',
-        destination: 'USLGB',
-        voyageDetails: `LCL Service / ${format(addDays(today, 10), 'ddMMMyy').toUpperCase()} / LCL`,
-        buyRate: lclBuyRateEntry.rate,
-        allocation: 50,
-    });
-}
-
+// Removed LCL specific rate generation from mockScheduleRates
 
 export const findBuyRate = (pol: string, pod: string, equipment: string, carrier?: string): number => {
     const polPort = mockPorts.find(p => p.name === pol);
     const podPort = mockPorts.find(p => p.name === pod);
 
-    if (!polPort || !podPort) return equipment === 'LCL' ? 50 : 1000;
+    if (!polPort || !podPort) return 1000; // Simplified fallback
 
     const polCode = polPort.code;
     const podCode = podPort.code;
@@ -203,13 +176,13 @@ export const findBuyRate = (pol: string, pod: string, equipment: string, carrier
     const potentialRates = initialMockBuyRates.filter(br =>
         br.pol === polCode &&
         br.pod === podCode &&
-        br.equipment === equipment && // This will now use new equipment names
+        br.equipment === equipment &&
         (carrier ? br.carrier === carrier : true)
     );
     if (potentialRates.length > 0) {
         return potentialRates.sort((a,b) => a.rate - b.rate)[0].rate;
     }
-    return equipment === 'LCL' ? 50 : (equipment === 'Air Freight Unit' ? 200 : 1000); // Added fallback for Air
+    return 1000; // Simplified fallback, removed LCL/Air Freight specific logic
 };
 
 
@@ -226,15 +199,14 @@ export const quotationsToSeedFromImage: Omit<Quotation, 'id' | 'createdAt' | 'up
   { customerName: 'DEF Limited', pol: 'Nhava Sheva', pod: 'Felixstowe', equipment: '20ft Dry', type: 'Export', buyRate: findBuyRate('Nhava Sheva', 'Felixstowe', '20ft Dry', 'MAEU'), sellRate: 1100, status: 'Draft', selectedRateId: initialMockBuyRates.find(br=>br.carrier === 'MAEU' && br.pol==='INNSA'&&br.pod==='GBFXS'&&br.equipment==='20ft Dry')?.id },
   { customerName: 'DEF Limited', pol: 'Nhava Sheva', pod: 'Felixstowe', equipment: '40ft Dry', type: 'Export', buyRate: findBuyRate('Nhava Sheva', 'Felixstowe', '40ft Dry', 'ONEY'), sellRate: 1475, status: 'Draft', selectedRateId: initialMockBuyRates.find(br=>br.carrier === 'ONEY' && br.pol==='INNSA'&&br.pod==='GBFXS'&&br.equipment==='40ft Dry')?.id },
   { customerName: 'DEF Limited', pol: 'Nhava Sheva', pod: 'Felixstowe', equipment: '40ft High Cube', type: 'Export', buyRate: findBuyRate('Nhava Sheva', 'Felixstowe', '40ft High Cube', 'ONEY'), sellRate: 1475, status: 'Draft', selectedRateId: initialMockBuyRates.find(br=>br.carrier === 'ONEY' && br.pol==='INNSA'&&br.pod==='GBFXS'&&br.equipment==='40ft High Cube')?.id },
-  { customerName: 'BCD Limited', pol: 'Shanghai', pod: 'Long Beach', equipment: 'LCL', type: 'Import', buyRate: (findBuyRate('Shanghai', 'Long Beach', 'LCL') * 11), sellRate: (70 * 11), status: 'Draft', selectedRateId: initialMockBuyRates.find(br=>br.pol==='CNSGH'&&br.pod==='USLGB'&&br.equipment==='LCL')?.id },
-  { customerName: 'Air Cargo Inc', pol: 'Shanghai', pod: 'Long Beach', equipment: 'Air Freight Unit', type: 'Import', buyRate: findBuyRate('Shanghai', 'Long Beach', 'Air Freight Unit') * 5, sellRate: 250 * 5, status: 'Draft', selectedRateId: undefined }, // Example for Air Freight
+  // Removed LCL and Air Freight Unit entries from quotationsToSeedFromImage
 ];
 
 type TempBookingSeedData = Omit<Booking, 'id' | 'createdAt' | 'updatedAt' | 'quotationId' | 'profitAndLoss'> & { quotationRefCustomer: string, quotationRefPol: string, quotationRefPod: string, quotationRefEquipment: string };
 
 export const bookingsToSeedFromImageBase: TempBookingSeedData[] = [
   { quotationRefCustomer: 'ABC Limited', quotationRefPol: 'Chennai', quotationRefPod: 'Long Beach', quotationRefEquipment: '20ft Dry', customerName: 'ABC Limited', pol: 'Chennai', pod: 'Long Beach', equipment: '20ft Dry', type: 'Export', buyRate: findBuyRate('Chennai', 'Long Beach', '20ft Dry','HLCU'), sellRate: 1100, status: 'Booked' },
-  { quotationRefCustomer: 'BCD Limited', quotationRefPol: 'Shanghai', quotationRefPod: 'Long Beach', quotationRefEquipment: 'LCL', customerName: 'BCD Limited', pol: 'Shanghai', pod: 'Long Beach', equipment: 'LCL', type: 'Import', buyRate: (findBuyRate('Shanghai', 'Long Beach', 'LCL')*11), sellRate: (70*11), status: 'Booked' },
+  // Removed LCL entry from bookingsToSeedFromImageBase
   { quotationRefCustomer: 'DEF Limited', quotationRefPol: 'Nhava Sheva', quotationRefPod: 'Felixstowe', quotationRefEquipment: '40ft High Cube', customerName: 'DEF Limited', pol: 'Nhava Sheva', pod: 'Felixstowe', equipment: '40ft High Cube', type: 'Export', buyRate: findBuyRate('Nhava Sheva', 'Felixstowe', '40ft High Cube', 'ONEY'), sellRate: 1475, status: 'Booked' },
   { quotationRefCustomer: 'FED Limited', quotationRefPol: 'Savannah', quotationRefPod: 'Dubai', quotationRefEquipment: '40ft Dry', customerName: 'FED Limited', pol: 'Savannah', pod: 'Dubai', equipment: '40ft Dry', type: 'Export', buyRate: findBuyRate('Savannah', 'Dubai', '40ft Dry', 'HLCU'), sellRate: 1100, status: 'Booked' },
   { quotationRefCustomer: 'DEF Limited', quotationRefPol: 'Felixstowe', quotationRefPod: 'Savannah', quotationRefEquipment: '40ft Dry', customerName: 'DEF Limited', pol: 'Felixstowe', pod: 'Savannah', equipment: '40ft Dry', type: 'Export', buyRate: findBuyRate('Felixstowe', 'Savannah', '40ft Dry', 'MAEU'), sellRate: 1150, status: 'Booked' },
@@ -242,3 +214,4 @@ export const bookingsToSeedFromImageBase: TempBookingSeedData[] = [
 
 
 export const simulateDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+
