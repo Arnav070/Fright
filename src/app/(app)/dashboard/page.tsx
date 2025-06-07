@@ -178,28 +178,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {user?.role === 'Admin' && (
-        <Card className="mt-6 border-destructive/50">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle /> Developer Utilities</CardTitle>
-            <CardDescription>Use these actions with caution. They can lead to data loss.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="destructive"
-              onClick={() => setShowClearDataDialog(true)}
-              disabled={dataLoading}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear & Re-seed Quotation/Booking Data
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              This will delete ALL quotations and bookings and re-populate with initial mock data using the new ID format (CQ-X, CB-X).
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       <AlertDialog open={showClearDataDialog} onOpenChange={setShowClearDataDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
