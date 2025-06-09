@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
 import {
@@ -36,7 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns"; // Import parseISO
+import { format, parseISO, isValid } from "date-fns";
 import type { BuyRate, Port } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { ScrollArea } from '../ui/scroll-area';
@@ -79,13 +78,19 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
   const { ports } = useData();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const parseDateString = (dateString: string | undefined): Date | undefined => {
+    if (!dateString) return undefined;
+    const parsed = parseISO(dateString);
+    return isValid(parsed) ? parsed : undefined;
+  };
+  
   const form = useForm<BuyRateFormValues>({
     resolver: zodResolver(buyRateFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      rate: Number(initialData.rate),
-      validFrom: parseISO(initialData.validFrom), // Parse string date to Date object
-      validTo: parseISO(initialData.validTo),     // Parse string date to Date object
+      rate: Number(initialData.rate), // Ensure rate is a number
+      validFrom: parseDateString(initialData.validFrom) || new Date(),
+      validTo: parseDateString(initialData.validTo) || new Date(),
     } : {
       carrier: '',
       pol: '',
@@ -102,13 +107,13 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
   });
   
   React.useEffect(() => {
-    if (open) { // Reset form only when dialog opens
+    if (open) {
       if (initialData) {
         form.reset({
           ...initialData,
           rate: Number(initialData.rate),
-          validFrom: parseISO(initialData.validFrom),
-          validTo: parseISO(initialData.validTo),
+          validFrom: parseDateString(initialData.validFrom) || new Date(),
+          validTo: parseDateString(initialData.validTo) || new Date(),
         });
       } else {
         form.reset({
@@ -122,6 +127,8 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
 
   const handleFormSubmit = async (data: BuyRateFormValues) => {
     setIsSubmitting(true);
+    // The onSubmit prop expects BuyRateFormValues which has Date objects.
+    // The DataContext will handle formatting these to strings for Firestore.
     await onSubmit(data);
     setIsSubmitting(false);
     if (!form.formState.errors || Object.keys(form.formState.errors).length === 0) {
@@ -228,4 +235,3 @@ export function BuyRateForm({ initialData, onSubmit, open, onOpenChange }: BuyRa
     </Dialog>
   );
 }
-

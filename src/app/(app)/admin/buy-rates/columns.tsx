@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { ColumnDef } from "@/components/common/DataTable";
 import type { BuyRate } from "@/lib/types";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 
 export const getBuyRateColumns = (): ColumnDef<BuyRate>[] => [
   { accessorKey: "carrier", header: "Carrier" },
@@ -21,11 +22,17 @@ export const getBuyRateColumns = (): ColumnDef<BuyRate>[] => [
   { 
     accessorKey: "validFrom", 
     header: "Valid From",
-    cell: ({ row }) => format(new Date(row.original.validFrom), "dd MMM yy")
+    cell: ({ row }) => {
+        const date = parseISO(row.original.validFrom);
+        return isValid(date) ? format(date, "dd MMM yy") : "Invalid Date";
+    }
   },
   { 
     accessorKey: "validTo", 
     header: "Valid To",
-    cell: ({ row }) => format(new Date(row.original.validTo), "dd MMM yy")
+    cell: ({ row }) => {
+        const date = parseISO(row.original.validTo);
+        return isValid(date) ? format(date, "dd MMM yy") : "Invalid Date";
+    }
   },
 ];

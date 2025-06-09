@@ -52,8 +52,7 @@ export default function ManageBuyRatesPage() {
   }, [fetchBuyRates, pageSize]);
 
   React.useEffect(() => {
-    // Reset to page 1 when search term changes
-    if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) { // Avoid resetting if only debouncing initial empty term
+    if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) { 
        setCurrentPage(1);
        loadData(1, debouncedSearchTerm);
     } else {
@@ -81,25 +80,20 @@ export default function ManageBuyRatesPage() {
     if (itemToDelete) {
       await deleteBuyRate(itemToDelete.id);
       toast({ title: "Success", description: "Buy Rate deleted successfully." });
-      loadData(currentPage, debouncedSearchTerm); // Refresh list
+      loadData(currentPage, debouncedSearchTerm); 
       setShowDeleteDialog(false);
       setItemToDelete(null);
     }
   };
 
   const handleFormSubmit = async (data: BuyRateFormValues) => {
-    const formattedData = {
-      ...data,
-      validFrom: format(data.validFrom, "yyyy-MM-dd"),
-      validTo: format(data.validTo, "yyyy-MM-dd"),
-    };
-
+    // DataContext now handles date formatting to string for Firestore
     if (editingBuyRate) {
-      await updateBuyRate(editingBuyRate.id, formattedData);
-      toast({ title: "Success", description: "Buy Rate updated successfully." });
+      await updateBuyRate(editingBuyRate.id, data as Partial<Omit<BuyRate, 'id'>>);
+      toast({ title: "Success", description: "BuyRate updated successfully." });
     } else {
-      await createBuyRate(formattedData);
-      toast({ title: "Success", description: "Buy Rate created successfully." });
+      await createBuyRate(data as Omit<BuyRate, 'id'>);
+      toast({ title: "Success", description: "BuyRate created successfully." });
     }
     loadData(currentPage, debouncedSearchTerm);
     setIsFormOpen(false);

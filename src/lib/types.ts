@@ -18,25 +18,24 @@ export interface Quotation {
   pod: string; // Port of Discharge
   equipment: string; // e.g., "40ft High Cube"
   type: 'Import' | 'Export' | 'Cross-Trade'; // Or other relevant types
-  buyRate: number;
-  sellRate: number;
+  buyRate?: number; // Optional: Can be from selectedRateId or manual
+  sellRate?: number; // Optional: Can be manual or derived
   profitAndLoss: number;
   status: QuotationStatus;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
   selectedRateId?: string;
+  notes?: string;
 }
 
 export interface ScheduleRate {
   id: string;
   carrier: string;
-  origin: string;
-  destination: string;
-  // "String" seems like a vessel/voyage string, let's call it voyageDetails
-  voyageDetails: string;
+  origin: string; // Port Code
+  destination: string; // Port Code
+  voyageDetails: string; // e.g., Service String / Vessel Voyage / Equipment
   buyRate: number;
   allocation: number; // available capacity
-  // Sell rate and margin will be calculated/entered in quotation flow
 }
 
 export interface Booking {
@@ -47,12 +46,12 @@ export interface Booking {
   pod: string;
   equipment: string;
   type: 'Import' | 'Export' | 'Cross-Trade';
-  buyRate: number; // This might be the selected rate from quotation or re-confirmed
-  sellRate: number; // From quotation
-  profitAndLoss: number; // From quotation
-  status: 'Booked' | 'Shipped' | 'Delivered' | 'Cancelled'; // Simplified status
-  createdAt: string;
-  updatedAt: string;
+  buyRate: number;
+  sellRate: number;
+  profitAndLoss: number;
+  status: 'Booked' | 'Shipped' | 'Delivered' | 'Cancelled';
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
   selectedCarrierRateId?: string;
   notes?: string;
 }
@@ -60,28 +59,27 @@ export interface Booking {
 export interface BuyRate {
   id: string;
   carrier: string;
-  pol: string;
-  pod: string;
+  pol: string; // Port Name (will be mapped to code for ScheduleRate generation)
+  pod: string; // Port Name
   commodity: string;
   freightModeType: 'Sea' | 'Air' | 'Land';
-  equipment: string; // e.g., "20GP", "40HC", "LCL"
-  weightCapacity: string; // e.g., "20 TON", "10 CBM"
-  minBooking: string; // e.g., "1 TEU", "1 CBM"
-  rate: number; // The actual buy rate value
-  validFrom: string;
-  validTo: string;
+  equipment: string; // e.g., "20ft Dry", "40ft High Cube", "LCL"
+  weightCapacity: string;
+  minBooking: string;
+  rate: number;
+  validFrom: string; // "yyyy-MM-dd"
+  validTo: string;   // "yyyy-MM-dd"
 }
 
 export interface Schedule {
   id: string;
   carrier: string;
-  origin: string; // Could be port code
-  destination: string; // Could be port code
-  // "String" again, let's call it serviceRoute or voyageIdentifier
+  origin: string; // Port Name (will be mapped to code for ScheduleRate generation)
+  destination: string; // Port Name
   serviceRoute: string;
-  allocation: number; // Capacity allocated for this schedule
-  etd: string; // Estimated Time of Departure
-  eta: string; // Estimated Time of Arrival
+  allocation: number;
+  etd: string; // ISO string
+  eta: string; // ISO string
   frequency: 'Daily' | 'Weekly' | 'Bi-Weekly' | 'Monthly';
 }
 
