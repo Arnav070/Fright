@@ -18,13 +18,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Allow cross-origin requests from specific development origins
-  experimental: {
-    allowedDevOrigins: [
-      'https://6000-firebase-studio-1748517295240.cluster-ys234awlzbhwoxmkkse6qo3fz6.cloudworkstations.dev',
-      // You might need to add other origins if you access your dev server from different preview URLs
-    ],
-  },
   // If using next-themes, and it causes issues with server components or build:
   // experimental: {
   //   serverComponentsExternalPackages: ['@radix-ui/*'], // Example
