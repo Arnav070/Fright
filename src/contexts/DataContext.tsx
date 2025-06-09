@@ -16,7 +16,7 @@ import type {
 import {
   initialMockBuyRates,
   initialMockSchedules,
-  mockScheduleRates as staticMockScheduleRates, // Will be phased out
+  mockScheduleRates as staticMockScheduleRates, 
   mockPorts,
   quotationsToSeedFromImage,
   bookingsToSeedFromImageBase
@@ -41,6 +41,13 @@ import {
   setDoc,
   getCountFromServer,
 } from 'firebase/firestore';
+
+// Environment-specific collection names
+const QUOTATIONS_COLLECTION_NAME = process.env.NEXT_PUBLIC_QUOTATIONS_COLLECTION || 'quotations';
+const BOOKINGS_COLLECTION_NAME = process.env.NEXT_PUBLIC_BOOKINGS_COLLECTION || 'bookings';
+const BUY_RATES_COLLECTION_NAME = process.env.NEXT_PUBLIC_BUY_RATES_COLLECTION || 'buyRates';
+const SCHEDULES_COLLECTION_NAME = process.env.NEXT_PUBLIC_SCHEDULES_COLLECTION || 'schedules';
+
 
 interface DataContextType {
   ports: Port[];
@@ -141,12 +148,12 @@ const toSchedule = (docSnap: any): Schedule => {
   return {
     id: docSnap.id,
     carrier: data.carrier,
-    origin: data.origin, // Stored as Port Code
-    destination: data.destination, // Stored as Port Code
+    origin: data.origin, 
+    destination: data.destination, 
     serviceRoute: data.serviceRoute,
     allocation: data.allocation,
-    etd: data.etd, // Stored as ISO string
-    eta: data.eta, // Stored as ISO string
+    etd: data.etd, 
+    eta: data.eta, 
     frequency: data.frequency,
   };
 };
@@ -167,7 +174,7 @@ async function getNextIdForCollection(collectionName: string, prefix: string): P
       }
     }
   }
-  if (maxNum === 0 && ['quotations', 'bookings', 'buyRates', 'schedules'].includes(collectionName)) {
+  if (maxNum === 0 && [QUOTATIONS_COLLECTION_NAME, BOOKINGS_COLLECTION_NAME, BUY_RATES_COLLECTION_NAME, SCHEDULES_COLLECTION_NAME].includes(collectionName)) {
      const countSnapshot = await getCountFromServer(collection(db, collectionName));
      maxNum = countSnapshot.data().count;
   }
@@ -189,20 +196,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const batch = writeBatch(db);
     let seededSomething = false;
 
-    // Seed Quotations
-    const quotationsRef = collection(db, "quotations");
+    const quotationsRef = collection(db, QUOTATIONS_COLLECTION_NAME);
     const quotationsSnapshot = await getDocs(query(quotationsRef, limit(1)));
     const seededQuotationRefs: { [key: string]: string } = {}; 
 
     if (quotationsSnapshot.empty) {
-      console.log("Quotations collection is empty. Seeding quotations...");
+      console.log(`Quotations collection (${QUOTATIONS_COLLECTION_NAME}) is empty. Seeding...`);
       seededSomething = true;
       let quotationCounter = 0;
       for (const qData of quotationsToSeedFromImage) {
         quotationCounter++;
         const newQuotationId = `CQ-${quotationCounter}`;
         const profitAndLoss = (qData.sellRate || 0) - (qData.buyRate || 0);
-        const { id: sourceId, ...restOfQData } = qData; // Exclude 'id' if present in source
+        const { id: sourceId, ...restOfQData } = qData; 
         const quotationToSave: any = {
           ...restOfQData,
           buyRate: qData.buyRate === undefined ? null : qData.buyRate,
@@ -213,14 +219,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           selectedRateId: qData.selectedRateId === undefined ? null : qData.selectedRateId,
           notes: (qData as any).notes === undefined ? null : (qData as any).notes,
         };
-        const quotationDocRef = doc(db, "quotations", newQuotationId);
+        const quotationDocRef = doc(db, QUOTATIONS_COLLECTION_NAME, newQuotationId);
         batch.set(quotationDocRef, quotationToSave);
         const tempRefKey = `${qData.customerName}-${qData.pol}-${qData.pod}-${qData.equipment}`;
         seededQuotationRefs[tempRefKey] = newQuotationId;
       }
-      console.log(`${quotationsToSeedFromImage.length} quotations prepared for seeding.`);
+      console.log(`${quotationsToSeedFromImage.length} quotations prepared for seeding into ${QUOTATIONS_COLLECTION_NAME}.`);
     } else {
-      console.log("Quotations collection not empty, skipping quotation seed.");
+      console.log(`Quotations collection (${QUOTATIONS_COLLECTION_NAME}) not empty, skipping seed.`);
       const existingQuotationsSnapshot = await getDocs(query(quotationsRef, orderBy('__name__')));
       existingQuotationsSnapshot.docs.forEach(docSnap => {
         const qData = toQuotation(docSnap);
@@ -229,11 +235,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    // Seed Bookings
-    const bookingsRef = collection(db, "bookings");
+    const bookingsRef = collection(db, BOOKINGS_COLLECTION_NAME);
     const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1)));
     if (bookingsSnapshot.empty) {
-      console.log("Bookings collection is empty. Seeding bookings...");
+      console.log(`Bookings collection (${BOOKINGS_COLLECTION_NAME}) is empty. Seeding...`);
       seededSomething = true;
       let bookingCounter = 0;
       for (const bData of bookingsToSeedFromImageBase) {
@@ -243,7 +248,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const quotationId = seededQuotationRefs[tempRefKey];
 
         if (quotationId) {
-          const bookingDocRef = doc(db, "bookings", newBookingId);
+          const bookingDocRef = doc(db, BOOKINGS_COLLECTION_NAME, newBookingId);
           const { quotationRefCustomer, quotationRefPol, quotationRefPod, quotationRefEquipment, ...restOfBData } = bData;
           const profitAndLoss = (bData.sellRate || 0) - (bData.buyRate || 0);
           const bookingToSave: any = {
@@ -262,21 +267,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
           console.warn(`Could not find quotation ID for booking seed: ${tempRefKey}`);
         }
       }
-      console.log("Bookings prepared for seeding.");
+      console.log(`Bookings prepared for seeding into ${BOOKINGS_COLLECTION_NAME}.`);
     } else {
-      console.log("Bookings collection not empty, skipping booking seed.");
+      console.log(`Bookings collection (${BOOKINGS_COLLECTION_NAME}) not empty, skipping seed.`);
     }
 
-    // Seed BuyRates
-    const buyRatesRef = collection(db, "buyRates");
+    const buyRatesRef = collection(db, BUY_RATES_COLLECTION_NAME);
     const buyRatesSnapshot = await getDocs(query(buyRatesRef, limit(1)));
     if (buyRatesSnapshot.empty) {
-        console.log("BuyRates collection is empty. Seeding buy rates...");
+        console.log(`BuyRates collection (${BUY_RATES_COLLECTION_NAME}) is empty. Seeding...`);
         seededSomething = true;
         initialMockBuyRates.forEach((brDataSource, index) => {
             const { id: brIdFromSource, ...restOfBrData } = brDataSource; 
             const buyRateId = brIdFromSource.startsWith("BR-IMG-") || brIdFromSource.startsWith("BR-LCL-") ? brIdFromSource : `BR-Seed-${index + 1}`;
-            const buyRateDocRef = doc(db, "buyRates", buyRateId);
+            const buyRateDocRef = doc(db, BUY_RATES_COLLECTION_NAME, buyRateId);
             const dataToSet = {
               ...restOfBrData,
               validFrom: typeof restOfBrData.validFrom === 'string' ? restOfBrData.validFrom : format(restOfBrData.validFrom as unknown as Date, "yyyy-MM-dd"),
@@ -284,32 +288,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
             };
             batch.set(buyRateDocRef, dataToSet);
         });
-        console.log(`${initialMockBuyRates.length} buy rates prepared for seeding.`);
+        console.log(`${initialMockBuyRates.length} buy rates prepared for seeding into ${BUY_RATES_COLLECTION_NAME}.`);
     } else {
-        console.log("BuyRates collection not empty, skipping buy rate seed.");
+        console.log(`BuyRates collection (${BUY_RATES_COLLECTION_NAME}) not empty, skipping seed.`);
     }
 
-    // Seed Schedules
-    const schedulesRef = collection(db, "schedules");
+    const schedulesRef = collection(db, SCHEDULES_COLLECTION_NAME);
     const schedulesSnapshot = await getDocs(query(schedulesRef, limit(1)));
     if (schedulesSnapshot.empty) {
-        console.log("Schedules collection is empty. Seeding schedules...");
+        console.log(`Schedules collection (${SCHEDULES_COLLECTION_NAME}) is empty. Seeding...`);
         seededSomething = true;
         initialMockSchedules.forEach((schDataSource, index) => {
             const { id: schIdFromSource, ...restOfSchData } = schDataSource;
             const scheduleId = schIdFromSource.startsWith("SCH-IMG-") ? schIdFromSource : `SCH-Seed-${index + 1}`;
-            const scheduleDocRef = doc(db, "schedules", scheduleId);
-            // Ensure ETD and ETA are ISO strings (they should be from mockData)
+            const scheduleDocRef = doc(db, SCHEDULES_COLLECTION_NAME, scheduleId);
             const dataToSet = {
               ...restOfSchData,
-              etd: restOfSchData.etd, // Should be ISO string
-              eta: restOfSchData.eta, // Should be ISO string
+              etd: restOfSchData.etd, 
+              eta: restOfSchData.eta, 
             };
             batch.set(scheduleDocRef, dataToSet);
         });
-        console.log(`${initialMockSchedules.length} schedules prepared for seeding.`);
+        console.log(`${initialMockSchedules.length} schedules prepared for seeding into ${SCHEDULES_COLLECTION_NAME}.`);
     } else {
-        console.log("Schedules collection not empty, skipping schedule seed.");
+        console.log(`Schedules collection (${SCHEDULES_COLLECTION_NAME}) not empty, skipping seed.`);
     }
     
     if (seededSomething) {
@@ -327,12 +329,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       await seedDatabaseIfEmpty();
 
-      const quotationsQuery = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
+      const quotationsQuery = query(collection(db, QUOTATIONS_COLLECTION_NAME), orderBy("createdAt", "desc"));
       const quotationsSnapshotData = await getDocs(quotationsQuery);
       const fetchedQuotations = quotationsSnapshotData.docs.map(toQuotation);
       setAllQuotationsForChart(fetchedQuotations);
 
-      const bookingsQuery = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
+      const bookingsQuery = query(collection(db, BOOKINGS_COLLECTION_NAME), orderBy("createdAt", "desc"));
       const bookingsSnapshotData = await getDocs(bookingsQuery);
       const fetchedBookings = bookingsSnapshotData.docs.map(toBooking);
       setAllBookingsForChartData(fetchedBookings);
@@ -360,10 +362,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [allQuotationsForChart]);
 
 
-  // Quotation Operations
   const fetchQuotations = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
-    const qCollectionRef = collection(db, "quotations");
+    const qCollectionRef = collection(db, QUOTATIONS_COLLECTION_NAME);
     let allQuotations: Quotation[];
 
     if (searchTerm) {
@@ -390,7 +391,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getQuotationById = useCallback(async (id: string) => {
     setAppLoading(true);
     try {
-      const docRef = doc(db, "quotations", id);
+      const docRef = doc(db, QUOTATIONS_COLLECTION_NAME, id);
       const docSnap = await getDoc(docRef);
       setAppLoading(false);
       return docSnap.exists() ? toQuotation(docSnap) : undefined;
@@ -404,7 +405,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createQuotation = useCallback(async (quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'profitAndLoss'>) => {
     setAppLoading(true);
     try {
-      const newId = await getNextIdForCollection("quotations", "CQ-");
+      const newId = await getNextIdForCollection(QUOTATIONS_COLLECTION_NAME, "CQ-");
       const finalBuyRate = quotationData.buyRate;
       const finalSellRate = quotationData.sellRate;
 
@@ -419,7 +420,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         notes: (quotationData as any).notes === undefined ? null : (quotationData as any).notes,
       };
 
-      await setDoc(doc(db, "quotations", newId), dataToSave);
+      await setDoc(doc(db, QUOTATIONS_COLLECTION_NAME, newId), dataToSave);
       await loadInitialDataForCharts();
       setAppLoading(false);
       return {
@@ -441,7 +442,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateQuotation = useCallback(async (id: string, quotationData: Partial<Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>>) => {
     setAppLoading(true);
     try {
-      const docRef = doc(db, "quotations", id);
+      const docRef = doc(db, QUOTATIONS_COLLECTION_NAME, id);
       const currentDocSnap = await getDoc(docRef);
       if (!currentDocSnap.exists()) throw new Error("Quotation not found for update");
       const currentData = toQuotation(currentDocSnap);
@@ -482,7 +483,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deleteQuotation = useCallback(async (id: string) => {
     setAppLoading(true);
     try {
-      const qtnDocRef = doc(db, "quotations", id);
+      const qtnDocRef = doc(db, QUOTATIONS_COLLECTION_NAME, id);
       const qtnSnap = await getDoc(qtnDocRef);
       if (qtnSnap.exists() && qtnSnap.data().status === 'Booking Completed') {
         setAppLoading(false);
@@ -499,10 +500,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [loadInitialDataForCharts]);
 
-  // Booking Operations
   const fetchBookings = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
-    const bCollectionRef = collection(db, "bookings");
+    const bCollectionRef = collection(db, BOOKINGS_COLLECTION_NAME);
     let allBookings: Booking[];
 
     if (searchTerm) {
@@ -529,7 +529,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
    const getBookingById = useCallback(async (id: string) => {
     setAppLoading(true);
      try {
-      const docRef = doc(db, "bookings", id);
+      const docRef = doc(db, BOOKINGS_COLLECTION_NAME, id);
       const docSnap = await getDoc(docRef);
       setAppLoading(false);
       return docSnap.exists() ? toBooking(docSnap) : undefined;
@@ -544,7 +544,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setAppLoading(true);
     const batchOp = writeBatch(db);
     try {
-      const newId = await getNextIdForCollection("bookings", "CB-");
+      const newId = await getNextIdForCollection(BOOKINGS_COLLECTION_NAME, "CB-");
       const finalBuyRate = bookingData.buyRate ?? 0;
       const finalSellRate = bookingData.sellRate ?? 0;
 
@@ -559,10 +559,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         notes: bookingData.notes === undefined ? null : bookingData.notes,
       };
 
-      const bookingDocRef = doc(db, "bookings", newId);
+      const bookingDocRef = doc(db, BOOKINGS_COLLECTION_NAME, newId);
       batchOp.set(bookingDocRef, dataToSave);
 
-      const quotationDocRef = doc(db, "quotations", bookingData.quotationId);
+      const quotationDocRef = doc(db, QUOTATIONS_COLLECTION_NAME, bookingData.quotationId);
       batchOp.update(quotationDocRef, { status: 'Booking Completed', updatedAt: serverTimestamp() });
 
       await batchOp.commit();
@@ -587,7 +587,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateBooking = useCallback(async (id: string, bookingData: Partial<Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>>) => {
     setAppLoading(true);
     try {
-      const docRef = doc(db, "bookings", id);
+      const docRef = doc(db, BOOKINGS_COLLECTION_NAME, id);
       const currentDocSnap = await getDoc(docRef);
       if (!currentDocSnap.exists()) throw new Error("Booking not found for update");
       const currentData = toBooking(currentDocSnap);
@@ -629,7 +629,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setAppLoading(true);
     const batchOp = writeBatch(db);
     try {
-      const bookingDocRef = doc(db, "bookings", id);
+      const bookingDocRef = doc(db, BOOKINGS_COLLECTION_NAME, id);
       const bookingSnap = await getDoc(bookingDocRef);
       if (!bookingSnap.exists()) {
         setAppLoading(false);
@@ -638,7 +638,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const bookingToDelete = toBooking(bookingSnap);
       batchOp.delete(bookingDocRef);
 
-      const quotationDocRef = doc(db, "quotations", bookingToDelete.quotationId);
+      const quotationDocRef = doc(db, QUOTATIONS_COLLECTION_NAME, bookingToDelete.quotationId);
       const quotationSnap = await getDoc(quotationDocRef);
       if (quotationSnap.exists() && quotationSnap.data().status === 'Booking Completed') {
          batchOp.update(quotationDocRef, { status: 'Submitted', updatedAt: serverTimestamp() });
@@ -654,11 +654,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [loadInitialDataForCharts]);
 
-
-  // BuyRate Operations
   const fetchBuyRates = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
-    const brCollectionRef = collection(db, "buyRates");
+    const brCollectionRef = collection(db, BUY_RATES_COLLECTION_NAME);
     let allBuyRates: BuyRate[];
 
     const snapshot = await getDocs(query(brCollectionRef, orderBy("validTo", "desc"))); 
@@ -683,13 +681,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createBuyRate = useCallback(async (data: Omit<BuyRate, 'id'>) => {
     setAppLoading(true);
     try {
-      const newId = await getNextIdForCollection("buyRates", "BR-");
+      const newId = await getNextIdForCollection(BUY_RATES_COLLECTION_NAME, "BR-");
       const dataToSave = {
         ...data,
         validFrom: typeof data.validFrom === 'string' ? data.validFrom : format(data.validFrom as unknown as Date, "yyyy-MM-dd"),
         validTo: typeof data.validTo === 'string' ? data.validTo : format(data.validTo as unknown as Date, "yyyy-MM-dd"),
       };
-      await setDoc(doc(db, "buyRates", newId), dataToSave);
+      await setDoc(doc(db, BUY_RATES_COLLECTION_NAME, newId), dataToSave);
       setAppLoading(false);
       return { ...dataToSave, id: newId };
     } catch (error) {
@@ -702,7 +700,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateBuyRate = useCallback(async (id: string, data: Partial<Omit<BuyRate, 'id'>>) => {
     setAppLoading(true);
     try {
-      const docRef = doc(db, "buyRates", id);
+      const docRef = doc(db, BUY_RATES_COLLECTION_NAME, id);
       const dataToUpdate: any = { ...data };
       if (data.validFrom) {
         dataToUpdate.validFrom = typeof data.validFrom === 'string' ? data.validFrom : format(data.validFrom as unknown as Date, "yyyy-MM-dd");
@@ -724,7 +722,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deleteBuyRate = useCallback(async (id: string) => {
     setAppLoading(true);
     try {
-      await deleteDoc(doc(db, "buyRates", id));
+      await deleteDoc(doc(db, BUY_RATES_COLLECTION_NAME, id));
       setAppLoading(false);
       return true;
     } catch (error) {
@@ -734,10 +732,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Schedule Operations (Firestore)
   const fetchSchedules = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
-    const schCollectionRef = collection(db, "schedules");
+    const schCollectionRef = collection(db, SCHEDULES_COLLECTION_NAME);
     let allSchedules: Schedule[];
 
     const snapshot = await getDocs(query(schCollectionRef, orderBy("etd", "desc")));
@@ -747,12 +744,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const lowerSearchTerm = searchTerm.toLowerCase();
         allSchedules = allSchedules.filter(s =>
             s.carrier.toLowerCase().includes(lowerSearchTerm) ||
-            s.origin.toLowerCase().includes(lowerSearchTerm) || // origin is port code
-            s.destination.toLowerCase().includes(lowerSearchTerm) || // destination is port code
+            s.origin.toLowerCase().includes(lowerSearchTerm) || 
+            s.destination.toLowerCase().includes(lowerSearchTerm) || 
             s.serviceRoute.toLowerCase().includes(lowerSearchTerm) ||
             s.frequency.toLowerCase().includes(lowerSearchTerm) ||
-            portsData.find(p => p.code === s.origin)?.name.toLowerCase().includes(lowerSearchTerm) || // search by port name
-            portsData.find(p => p.code === s.destination)?.name.toLowerCase().includes(lowerSearchTerm) // search by port name
+            portsData.find(p => p.code === s.origin)?.name.toLowerCase().includes(lowerSearchTerm) || 
+            portsData.find(p => p.code === s.destination)?.name.toLowerCase().includes(lowerSearchTerm) 
         );
     }
     
@@ -766,14 +763,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createSchedule = useCallback(async (data: Omit<Schedule, 'id'>) => {
     setAppLoading(true);
     try {
-      const newId = await getNextIdForCollection("schedules", "SCH-");
+      const newId = await getNextIdForCollection(SCHEDULES_COLLECTION_NAME, "SCH-");
       const dataToSave = {
         ...data,
-        // Origin and Destination should be port codes. Ensure form passes these.
         etd: typeof data.etd === 'string' ? data.etd : (data.etd as unknown as Date).toISOString(),
         eta: typeof data.eta === 'string' ? data.eta : (data.eta as unknown as Date).toISOString(),
       };
-      await setDoc(doc(db, "schedules", newId), dataToSave);
+      await setDoc(doc(db, SCHEDULES_COLLECTION_NAME, newId), dataToSave);
       setAppLoading(false);
       return { ...dataToSave, id: newId };
     } catch (error) {
@@ -786,7 +782,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const updateSchedule = useCallback(async (id: string, data: Partial<Omit<Schedule, 'id'>>) => {
     setAppLoading(true);
     try {
-      const docRef = doc(db, "schedules", id);
+      const docRef = doc(db, SCHEDULES_COLLECTION_NAME, id);
       const dataToUpdate: any = { ...data };
       if (data.etd) {
         dataToUpdate.etd = typeof data.etd === 'string' ? data.etd : (data.etd as unknown as Date).toISOString();
@@ -808,7 +804,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deleteSchedule = useCallback(async (id: string) => {
     setAppLoading(true);
     try {
-      await deleteDoc(doc(db, "schedules", id));
+      await deleteDoc(doc(db, SCHEDULES_COLLECTION_NAME, id));
       setAppLoading(false);
       return true;
     } catch (error) {
@@ -821,11 +817,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string; equipment?: string }) => {
     setAppLoading(true);
-    // This will need a significant refactor to use Firestore data for Schedules and BuyRates
-    // For now, returning empty or static mock to avoid breaking UI too much during transition.
-    // TODO: Implement Firestore-backed searchScheduleRates in the next step.
-    
-    // Placeholder for mock staticMockScheduleRates, filtering slightly
     let results = [...staticMockScheduleRates]; 
     const polPort = params.pol ? portsData.find(p => p.name.toLowerCase() === params.pol!.toLowerCase()) : undefined;
     const podPort = params.pod ? portsData.find(p => p.name.toLowerCase() === params.pod!.toLowerCase()) : undefined;
@@ -870,4 +861,3 @@ export function useData() {
   }
   return context;
 }
-
