@@ -54,6 +54,7 @@ export interface Booking {
   createdAt: string;
   updatedAt: string;
   selectedCarrierRateId?: string;
+  notes?: string;
 }
 
 export interface BuyRate {
@@ -100,5 +101,6 @@ export interface QuotationStatusSummary {
 
 export interface BookingsByMonthEntry {
   month: string;
-  count: number;
+  allocationBased: number;
+  outOfAllocation: number;
 }

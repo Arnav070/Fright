@@ -9,7 +9,7 @@ import Link from "next/link";
 import { PlusCircle, BarChart3, PieChart as PieChartIcon, Users, Settings, Ship, FileText, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext"; 
-import type { QuotationStatusSummary, BookingsByMonthEntry } from "@/lib/types"; 
+import type { QuotationStatusSummary, BookingsByMonthEntry, Booking } from "@/lib/types"; 
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, XAxis, YAxis, CartesianGrid, Bar } from 'recharts';
 import {
   AlertDialog,
@@ -22,9 +22,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { parseISO } from 'date-fns';
 
 const PIE_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']; 
-const BAR_CHART_COLORS = ['hsl(var(--chart-1))'];
+const BAR_CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))']; // For stacked bars
 
 function QuotationStatusPieChart({ summaryData }: { summaryData: QuotationStatusSummary | null }) {
   const [mounted, setMounted] = React.useState(false);
@@ -67,7 +68,8 @@ function BookingsByMonthBarChart({ monthlyData }: { monthlyData: BookingsByMonth
         <YAxis allowDecimals={false} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="count" name="Bookings" fill={BAR_CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="outOfAllocation" name="Out-of-Allocation" stackId="a" fill={BAR_CHART_COLORS[1]} />
+        <Bar dataKey="allocationBased" name="Allocation-Based" stackId="a" fill={BAR_CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -75,21 +77,58 @@ function BookingsByMonthBarChart({ monthlyData }: { monthlyData: BookingsByMonth
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { quotationStatusSummary, bookingsByMonth, loading: dataLoading, clearAndReseedData } = useData(); 
-  const { toast } = useToast();
-  const [showClearDataDialog, setShowClearDataDialog] = React.useState(false);
+  const { allBookingsForChart, quotationStatusSummary, loading: dataLoading } = useData(); 
+  const [bookingsByMonthData, setBookingsByMonthData] = React.useState<BookingsByMonthEntry[]>([]);
 
-  const handleClearAndReseed = async () => {
-    setShowClearDataDialog(false); // Close dialog first
-    toast({ title: "Processing...", description: "Clearing and re-seeding data. This may take a moment." });
-    try {
-      await clearAndReseedData();
-      toast({ title: "Success!", description: "Data has been cleared and re-seeded with new IDs." });
-    } catch (error) {
-      console.error("Error during clear and re-seed:", error);
-      toast({ title: "Error", description: "Failed to clear and re-seed data. Check console.", variant: "destructive" });
+  React.useEffect(() => {
+    if (allBookingsForChart && allBookingsForChart.length > 0) {
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const countsByMonth: { [key: string]: { allocationBased: number; outOfAllocation: number } } = {};
+      const today = new Date();
+      const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+      allBookingsForChart.forEach((b: Booking) => {
+        const bookingDate = parseISO(b.createdAt);
+        if (bookingDate >= sixMonthsAgo && bookingDate <= today) {
+            const monthName = monthNames[bookingDate.getMonth()];
+            if (!countsByMonth[monthName]) {
+                countsByMonth[monthName] = { allocationBased: 0, outOfAllocation: 0 };
+            }
+            if (b.selectedCarrierRateId) {
+                countsByMonth[monthName].allocationBased++;
+            } else {
+                countsByMonth[monthName].outOfAllocation++;
+            }
+        }
+      });
+
+      const result: BookingsByMonthEntry[] = [];
+      const currentMonthIndex = today.getMonth();
+      for (let i = 5; i >= 0; i--) {
+        const monthIdx = (currentMonthIndex - i + 12) % 12;
+        const monthName = monthNames[monthIdx];
+        result.push({
+          month: monthName,
+          allocationBased: countsByMonth[monthName]?.allocationBased || 0,
+          outOfAllocation: countsByMonth[monthName]?.outOfAllocation || 0,
+        });
+      }
+      setBookingsByMonthData(result);
+    } else {
+       // If no bookings, set empty data for past 6 months
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const result: BookingsByMonthEntry[] = [];
+      const today = new Date();
+      const currentMonthIndex = today.getMonth();
+      for (let i = 5; i >= 0; i--) {
+        const monthIdx = (currentMonthIndex - i + 12) % 12;
+        const monthName = monthNames[monthIdx];
+        result.push({ month: monthName, allocationBased: 0, outOfAllocation: 0 });
+      }
+      setBookingsByMonthData(result);
     }
-  };
+  }, [allBookingsForChart]);
+
 
   return (
     <div className="space-y-6">
@@ -116,10 +155,10 @@ export default function DashboardPage() {
             <CardDescription>Number of bookings created over the last few months.</CardDescription>
           </CardHeader>
           <CardContent>
-             {dataLoading && (!bookingsByMonth || bookingsByMonth.length === 0) ? (
+             {dataLoading && (!bookingsByMonthData || bookingsByMonthData.length === 0) ? (
                  <div className="h-[300px] w-full bg-muted animate-pulse rounded-lg" />
             ) : (
-                <BookingsByMonthBarChart monthlyData={bookingsByMonth} />
+                <BookingsByMonthBarChart monthlyData={bookingsByMonthData} />
             )}
           </CardContent>
         </Card>
@@ -177,30 +216,6 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
-
-      <AlertDialog open={showClearDataDialog} onOpenChange={setShowClearDataDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action will permanently delete ALL existing quotations and bookings from the database.
-              The database will then be re-populated with the initial mock data, using the new ID formats (CQ-X, CB-X).
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearAndReseed}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-            >
-              Yes, Clear and Re-seed Data
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </div>
   );
 }
-
