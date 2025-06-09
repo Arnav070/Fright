@@ -9,7 +9,9 @@ import { PageHeader } from '@/components/common/PageHeader';
 import type { Booking } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { getBookingColumns } from './columns';
-import { PlusCircle, Edit, Eye, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Eye, Trash2, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
@@ -35,19 +37,27 @@ export default function BookingsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [bookingToDelete, setBookingToDelete] = React.useState<Booking | null>(null);
 
-  const loadBookings = React.useCallback(async (page: number) => {
-    const { data, total } = await fetchBookings(page, pageSize);
+  const loadBookings = React.useCallback(async (page: number, term: string) => {
+    const { data, total } = await fetchBookings(page, pageSize, term);
     setBookings(data);
     setTotalBookings(total);
     setCurrentPage(page);
   }, [fetchBookings, pageSize]);
 
   React.useEffect(() => {
-    loadBookings(currentPage);
-  }, [loadBookings, currentPage]);
+     if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) {
+       setCurrentPage(1);
+       loadBookings(1, debouncedSearchTerm);
+    } else {
+       loadBookings(currentPage, debouncedSearchTerm);
+    }
+  }, [loadBookings, currentPage, debouncedSearchTerm, searchTerm]);
 
   const handleEdit = (booking: Booking) => {
     router.push(`/bookings/${booking.id}/edit`);
@@ -63,7 +73,7 @@ export default function BookingsPage() {
       const success = await deleteBooking(bookingToDelete.id);
       if (success) {
         toast({ title: "Success", description: "Booking deleted successfully." });
-        loadBookings(currentPage); // Refresh list
+        loadBookings(currentPage, debouncedSearchTerm); 
       } else {
         toast({ title: "Error", description: "Failed to delete booking.", variant: "destructive" });
       }
@@ -93,6 +103,18 @@ export default function BookingsPage() {
           ) : null
         }
       />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+            type="search"
+            placeholder="Search bookings..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+            />
+        </div>
+      </div>
       <DataTable
         columns={columns}
         data={bookings}
@@ -100,7 +122,7 @@ export default function BookingsPage() {
         currentPage={currentPage}
         totalItems={totalBookings}
         pageCount={Math.ceil(totalBookings / pageSize)}
-        onPageChange={loadBookings}
+        onPageChange={(page) => loadBookings(page, debouncedSearchTerm)}
         pageSize={pageSize}
         renderRowActions={(row) => (
           <RowActionsDropdown>

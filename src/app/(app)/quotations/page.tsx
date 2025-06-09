@@ -9,7 +9,9 @@ import { PageHeader } from '@/components/common/PageHeader';
 import type { Quotation } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { getQuotationColumns } from './columns';
-import { PlusCircle, Edit, Trash2, Eye } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Eye, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,19 +37,27 @@ export default function QuotationsPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [quotationToDelete, setQuotationToDelete] = React.useState<Quotation | null>(null);
 
-  const loadQuotations = React.useCallback(async (page: number) => {
-    const { data, total } = await fetchQuotations(page, pageSize);
+  const loadQuotations = React.useCallback(async (page: number, term: string) => {
+    const { data, total } = await fetchQuotations(page, pageSize, term);
     setQuotations(data);
     setTotalQuotations(total);
     setCurrentPage(page);
   }, [fetchQuotations, pageSize]);
 
   React.useEffect(() => {
-    loadQuotations(currentPage);
-  }, [loadQuotations, currentPage]);
+     if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) {
+       setCurrentPage(1);
+       loadQuotations(1, debouncedSearchTerm);
+    } else {
+       loadQuotations(currentPage, debouncedSearchTerm);
+    }
+  }, [loadQuotations, currentPage, debouncedSearchTerm, searchTerm]);
 
   const handleEdit = (quotation: Quotation) => {
     router.push(`/quotations/${quotation.id}/edit`);
@@ -71,7 +81,7 @@ export default function QuotationsPage() {
       const success = await deleteQuotation(quotationToDelete.id);
       if (success) {
         toast({ title: "Success", description: "Quotation deleted successfully." });
-        loadQuotations(currentPage); // Refresh list
+        loadQuotations(currentPage, debouncedSearchTerm); 
       } else {
         toast({ title: "Error", description: "Failed to delete quotation. It might be linked to a booking.", variant: "destructive" });
       }
@@ -100,6 +110,18 @@ export default function QuotationsPage() {
           ) : null
         }
       />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+            type="search"
+            placeholder="Search quotations..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+            />
+        </div>
+      </div>
       <DataTable
         columns={columns}
         data={quotations}
@@ -107,7 +129,7 @@ export default function QuotationsPage() {
         currentPage={currentPage}
         totalItems={totalQuotations}
         pageCount={Math.ceil(totalQuotations / pageSize)}
-        onPageChange={loadQuotations}
+        onPageChange={(page) => loadQuotations(page, debouncedSearchTerm)}
         pageSize={pageSize}
         renderRowActions={(row) => (
           <RowActionsDropdown>

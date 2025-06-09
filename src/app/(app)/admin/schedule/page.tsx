@@ -9,7 +9,9 @@ import type { Schedule } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { getScheduleColumns } from './columns';
 import { ScheduleForm, type ScheduleFormValues } from '@/components/admin/ScheduleForm';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns'; // Import parseISO
+import { format, parseISO } from 'date-fns';
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export default function ManageSchedulesPage() {
@@ -33,22 +35,30 @@ export default function ManageSchedulesPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [editingSchedule, setEditingSchedule] = React.useState<Schedule | null>(null);
   
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [itemToDelete, setItemToDelete] = React.useState<Schedule | null>(null);
 
-  const loadData = React.useCallback(async (page: number) => {
-    const { data, total } = await fetchSchedules(page, pageSize);
+  const loadData = React.useCallback(async (page: number, term: string) => {
+    const { data, total } = await fetchSchedules(page, pageSize, term);
     setSchedules(data);
     setTotalSchedules(total);
     setCurrentPage(page);
   }, [fetchSchedules, pageSize]);
 
   React.useEffect(() => {
-    loadData(currentPage);
-  }, [loadData, currentPage]);
+     if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) {
+       setCurrentPage(1);
+       loadData(1, debouncedSearchTerm);
+    } else {
+       loadData(currentPage, debouncedSearchTerm);
+    }
+  }, [loadData, currentPage, debouncedSearchTerm, searchTerm]);
 
   const handleCreateNew = () => {
     setEditingSchedule(null);
@@ -69,19 +79,17 @@ export default function ManageSchedulesPage() {
     if (itemToDelete) {
       await deleteSchedule(itemToDelete.id);
       toast({ title: "Success", description: "Schedule deleted successfully." });
-      loadData(currentPage); // Refresh list
+      loadData(currentPage, debouncedSearchTerm);
       setShowDeleteDialog(false);
       setItemToDelete(null);
     }
   };
 
   const handleFormSubmit = async (data: ScheduleFormValues) => {
-    // Dates from form are JS Date objects. Firestore handles them.
-    // If Schedule type expects ISO strings:
     const formattedData = {
         ...data,
-        etd: data.etd.toISOString(), // Convert to ISO string
-        eta: data.eta.toISOString(), // Convert to ISO string
+        etd: data.etd.toISOString(),
+        eta: data.eta.toISOString(),
     };
 
     if (editingSchedule) {
@@ -91,7 +99,7 @@ export default function ManageSchedulesPage() {
       await createSchedule(formattedData);
       toast({ title: "Success", description: "Schedule created successfully." });
     }
-    loadData(currentPage);
+    loadData(currentPage, debouncedSearchTerm);
     setIsFormOpen(false);
     setEditingSchedule(null);
   };
@@ -112,6 +120,18 @@ export default function ManageSchedulesPage() {
           </Button>
         }
       />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+            type="search"
+            placeholder="Search schedules..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+            />
+        </div>
+      </div>
       <DataTable
         columns={columns}
         data={schedules}
@@ -119,7 +139,7 @@ export default function ManageSchedulesPage() {
         currentPage={currentPage}
         totalItems={totalSchedules}
         pageCount={Math.ceil(totalSchedules / pageSize)}
-        onPageChange={loadData}
+        onPageChange={(page) => loadData(page, debouncedSearchTerm)}
         pageSize={pageSize}
         renderRowActions={(row) => (
           <RowActionsDropdown>

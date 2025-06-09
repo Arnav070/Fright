@@ -9,7 +9,9 @@ import type { BuyRate } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { getBuyRateColumns } from './columns';
 import { BuyRateForm, type BuyRateFormValues } from '@/components/admin/BuyRateForm';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,22 +35,32 @@ export default function ManageBuyRatesPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const pageSize = 10;
 
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [editingBuyRate, setEditingBuyRate] = React.useState<BuyRate | null>(null);
   
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [itemToDelete, setItemToDelete] = React.useState<BuyRate | null>(null);
 
-  const loadData = React.useCallback(async (page: number) => {
-    const { data, total } = await fetchBuyRates(page, pageSize);
+  const loadData = React.useCallback(async (page: number, term: string) => {
+    const { data, total } = await fetchBuyRates(page, pageSize, term);
     setBuyRates(data);
     setTotalBuyRates(total);
     setCurrentPage(page);
   }, [fetchBuyRates, pageSize]);
 
   React.useEffect(() => {
-    loadData(currentPage);
-  }, [loadData, currentPage]);
+    // Reset to page 1 when search term changes
+    if (currentPage !== 1 && debouncedSearchTerm !== searchTerm) { // Avoid resetting if only debouncing initial empty term
+       setCurrentPage(1);
+       loadData(1, debouncedSearchTerm);
+    } else {
+       loadData(currentPage, debouncedSearchTerm);
+    }
+  }, [loadData, currentPage, debouncedSearchTerm, searchTerm]);
+
 
   const handleCreateNew = () => {
     setEditingBuyRate(null);
@@ -69,20 +81,17 @@ export default function ManageBuyRatesPage() {
     if (itemToDelete) {
       await deleteBuyRate(itemToDelete.id);
       toast({ title: "Success", description: "Buy Rate deleted successfully." });
-      loadData(currentPage); // Refresh list
+      loadData(currentPage, debouncedSearchTerm); // Refresh list
       setShowDeleteDialog(false);
       setItemToDelete(null);
     }
   };
 
   const handleFormSubmit = async (data: BuyRateFormValues) => {
-    // Dates from form are JS Date objects. Firestore can handle them.
-    // If your BuyRate type expects string dates, format them here.
-    // Since BuyRate type in types.ts has string dates:
     const formattedData = {
       ...data,
-      validFrom: format(data.validFrom, "yyyy-MM-dd"), // Keep as yyyy-MM-dd string as per type
-      validTo: format(data.validTo, "yyyy-MM-dd"),     // Keep as yyyy-MM-dd string as per type
+      validFrom: format(data.validFrom, "yyyy-MM-dd"),
+      validTo: format(data.validTo, "yyyy-MM-dd"),
     };
 
     if (editingBuyRate) {
@@ -92,7 +101,7 @@ export default function ManageBuyRatesPage() {
       await createBuyRate(formattedData);
       toast({ title: "Success", description: "Buy Rate created successfully." });
     }
-    loadData(currentPage);
+    loadData(currentPage, debouncedSearchTerm);
     setIsFormOpen(false);
     setEditingBuyRate(null);
   };
@@ -113,6 +122,18 @@ export default function ManageBuyRatesPage() {
           </Button>
         }
       />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+            type="search"
+            placeholder="Search buy rates..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+            />
+        </div>
+      </div>
       <DataTable
         columns={columns}
         data={buyRates}
@@ -120,7 +141,7 @@ export default function ManageBuyRatesPage() {
         currentPage={currentPage}
         totalItems={totalBuyRates}
         pageCount={Math.ceil(totalBuyRates / pageSize)}
-        onPageChange={loadData}
+        onPageChange={(page) => loadData(page, debouncedSearchTerm)}
         pageSize={pageSize}
         renderRowActions={(row) => (
           <RowActionsDropdown>
