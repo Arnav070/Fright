@@ -176,13 +176,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const seedDatabaseIfEmpty = useCallback(async () => {
     console.log("Checking if database needs seeding...");
-    const collectionsToSeed = [
-      { name: "quotations", data: quotationsToSeedFromImage, prefix: "CQ-", idField: 'id' },
-      // Bookings depend on quotation IDs, handle after quotations
-      { name: "buyRates", data: initialMockBuyRates, prefix: "BR-", idField: 'id' },
-      // Schedules handled later
-    ];
-
+    
     const batch = writeBatch(db);
     let seededSomething = false;
 
@@ -270,14 +264,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (buyRatesSnapshot.empty) {
         console.log("BuyRates collection is empty. Seeding buy rates...");
         seededSomething = true;
-        initialMockBuyRates.forEach((brData, index) => {
-            // Use pre-defined IDs from mockData if they exist and are unique, otherwise generate
-            const buyRateId = brData.id.startsWith("BR-IMG-") || brData.id.startsWith("BR-LCL-") ? brData.id : `BR-Seed-${index + 1}`;
+        initialMockBuyRates.forEach((brDataSource, index) => {
+            const { id: brIdFromSource, ...restOfBrData } = brDataSource; // Destructure id out
+            const buyRateId = brIdFromSource.startsWith("BR-IMG-") || brIdFromSource.startsWith("BR-LCL-") ? brIdFromSource : `BR-Seed-${index + 1}`;
             const buyRateDocRef = doc(db, "buyRates", buyRateId);
-            batch.set(buyRateDocRef, {
-                ...brData, 
-                id: undefined // Firestore uses document ID, don't store it in the fields
-            });
+            // Now, restOfBrData does not contain the 'id' field.
+            // Ensure validFrom and validTo are strings if they aren't already
+            const dataToSet = {
+              ...restOfBrData,
+              validFrom: typeof restOfBrData.validFrom === 'string' ? restOfBrData.validFrom : format(restOfBrData.validFrom as unknown as Date, "yyyy-MM-dd"),
+              validTo: typeof restOfBrData.validTo === 'string' ? restOfBrData.validTo : format(restOfBrData.validTo as unknown as Date, "yyyy-MM-dd"),
+            };
+            batch.set(buyRateDocRef, dataToSet);
         });
         console.log(`${initialMockBuyRates.length} buy rates prepared for seeding.`);
     } else {
@@ -816,3 +814,4 @@ export function useData() {
   }
   return context;
 }
+
