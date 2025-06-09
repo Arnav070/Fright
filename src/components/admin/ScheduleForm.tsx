@@ -42,8 +42,8 @@ import { ScrollArea } from '../ui/scroll-area';
 
 const scheduleFormSchema = z.object({
   carrier: z.string().min(1, 'Carrier is required'),
-  origin: z.string().min(1, 'Origin port code is required'), // Changed to port code
-  destination: z.string().min(1, 'Destination port code is required'), // Changed to port code
+  origin: z.string().min(1, 'Origin port code is required'),
+  destination: z.string().min(1, 'Destination port code is required'),
   serviceRoute: z.string().min(1, 'Service Route/String is required'),
   allocation: z.coerce.number().int().positive('Allocation must be a positive integer'),
   etd: z.date({ required_error: "ETD is required." }),
@@ -82,7 +82,7 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
       allocation: Number(initialData.allocation),
       etd: parseDateString(initialData.etd) || new Date(),
       eta: parseDateString(initialData.eta) || new Date(),
-      // origin and destination should be port codes if initialData is from Firestore
+      frequency: initialData.frequency,
     } : {
       carrier: '',
       origin: '',
@@ -103,6 +103,7 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
           allocation: Number(initialData.allocation),
           etd: parseDateString(initialData.etd) || new Date(),
           eta: parseDateString(initialData.eta) || new Date(),
+          frequency: initialData.frequency,
         });
       } else {
          form.reset({
@@ -115,11 +116,12 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
 
   const handleFormSubmit = async (data: ScheduleFormValues) => {
     setIsSubmitting(true);
-    // onSubmit in DataContext now expects Date objects to be converted to ISO strings
-    // This is handled by DataContext's createSchedule/updateSchedule
     await onSubmit(data); 
     setIsSubmitting(false);
-     if (!form.formState.errors || Object.keys(form.formState.errors).length === 0) {
+    // Only close dialog if submission was successful (no errors)
+    // We rely on the parent component toasting errors if onSubmit throws
+    const formErrors = form.formState.errors;
+    if (Object.keys(formErrors).length === 0) {
        onOpenChange(false);
     }
   };
