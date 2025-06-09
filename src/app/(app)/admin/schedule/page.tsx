@@ -11,7 +11,7 @@ import { getScheduleColumns } from './columns';
 import { ScheduleForm, type ScheduleFormValues } from '@/components/admin/ScheduleForm';
 import { PlusCircle, Edit, Trash2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useDebounce } from '../../../../hooks/useDebounce';
+import { useDebounce } from '../../../../hooks/useDebounce.ts';
 import {
   AlertDialog,
   AlertDialogAction,
