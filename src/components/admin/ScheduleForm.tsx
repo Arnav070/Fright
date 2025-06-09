@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from '@/components/ui/dialog';
 import {
@@ -36,15 +35,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns"; // Import parseISO
+import { format, parseISO, isValid } from "date-fns";
 import type { Schedule, Port } from '@/lib/types';
 import { useData } from '@/contexts/DataContext';
 import { ScrollArea } from '../ui/scroll-area';
 
 const scheduleFormSchema = z.object({
   carrier: z.string().min(1, 'Carrier is required'),
-  origin: z.string().min(1, 'Origin is required'),
-  destination: z.string().min(1, 'Destination is required'),
+  origin: z.string().min(1, 'Origin port code is required'), // Changed to port code
+  destination: z.string().min(1, 'Destination port code is required'), // Changed to port code
   serviceRoute: z.string().min(1, 'Service Route/String is required'),
   allocation: z.coerce.number().int().positive('Allocation must be a positive integer'),
   etd: z.date({ required_error: "ETD is required." }),
@@ -70,13 +69,20 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
   const { ports } = useData();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const parseDateString = (dateString: string | undefined): Date | undefined => {
+    if (!dateString) return undefined;
+    const parsed = parseISO(dateString);
+    return isValid(parsed) ? parsed : undefined;
+  };
+
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: initialData ? {
       ...initialData,
       allocation: Number(initialData.allocation),
-      etd: parseISO(initialData.etd), // Parse ISO string to Date
-      eta: parseISO(initialData.eta), // Parse ISO string to Date
+      etd: parseDateString(initialData.etd) || new Date(),
+      eta: parseDateString(initialData.eta) || new Date(),
+      // origin and destination should be port codes if initialData is from Firestore
     } : {
       carrier: '',
       origin: '',
@@ -90,13 +96,13 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
   });
 
   React.useEffect(() => {
-    if (open) { // Reset form only when dialog opens
+    if (open) { 
       if (initialData) {
         form.reset({
           ...initialData,
           allocation: Number(initialData.allocation),
-          etd: parseISO(initialData.etd),
-          eta: parseISO(initialData.eta),
+          etd: parseDateString(initialData.etd) || new Date(),
+          eta: parseDateString(initialData.eta) || new Date(),
         });
       } else {
          form.reset({
@@ -109,7 +115,9 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
 
   const handleFormSubmit = async (data: ScheduleFormValues) => {
     setIsSubmitting(true);
-    await onSubmit(data);
+    // onSubmit in DataContext now expects Date objects to be converted to ISO strings
+    // This is handled by DataContext's createSchedule/updateSchedule
+    await onSubmit(data); 
     setIsSubmitting(false);
      if (!form.formState.errors || Object.keys(form.formState.errors).length === 0) {
        onOpenChange(false);
@@ -134,17 +142,17 @@ export function ScheduleForm({ initialData, onSubmit, open, onOpenChange }: Sche
               )} />
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="origin" render={({ field }) => (
-                  <FormItem><FormLabel>Origin</FormLabel>
+                  <FormItem><FormLabel>Origin Port</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select Origin Port" /></SelectTrigger></FormControl>
-                      <SelectContent><ScrollArea className="h-40">{ports.map(p => <SelectItem key={p.code} value={p.name}>{p.name}</SelectItem>)}</ScrollArea></SelectContent>
+                      <SelectContent><ScrollArea className="h-40">{ports.map(p => <SelectItem key={p.code} value={p.code}>{p.name} ({p.code})</SelectItem>)}</ScrollArea></SelectContent>
                     </Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="destination" render={({ field }) => (
-                  <FormItem><FormLabel>Destination</FormLabel>
+                  <FormItem><FormLabel>Destination Port</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select Destination Port" /></SelectTrigger></FormControl>
-                      <SelectContent><ScrollArea className="h-40">{ports.map(p => <SelectItem key={p.code} value={p.name}>{p.name}</SelectItem>)}</ScrollArea></SelectContent>
+                      <SelectContent><ScrollArea className="h-40">{ports.map(p => <SelectItem key={p.code} value={p.code}>{p.name} ({p.code})</SelectItem>)}</ScrollArea></SelectContent>
                     </Select><FormMessage /></FormItem>
                 )} />
               </div>

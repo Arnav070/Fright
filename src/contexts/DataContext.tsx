@@ -18,7 +18,6 @@ import {
   initialMockSchedules,
   mockScheduleRates as staticMockScheduleRates, // Will be phased out
   mockPorts,
-  simulateDelay, // Will be removed for Firestore ops
   quotationsToSeedFromImage,
   bookingsToSeedFromImageBase
 } from '@/lib/mockData';
@@ -47,7 +46,6 @@ interface DataContextType {
   ports: Port[];
   loading: boolean;
   quotationStatusSummary: QuotationStatusSummary;
-  // bookingsByMonth: BookingsByMonthEntry[]; // This structure changed
 
   fetchQuotations: (page: number, pageSize: number, searchTerm?: string) => Promise<{ data: Quotation[], total: number }>;
   getQuotationById: (id: string) => Promise<Quotation | undefined>;
@@ -72,7 +70,7 @@ interface DataContextType {
   deleteSchedule: (id: string) => Promise<boolean>;
 
   searchScheduleRates: (params: { pol?: string; pod?: string; equipment?: string; }) => Promise<ScheduleRate[]>;
-  allBookingsForChart: Booking[]; // Expose for dashboard
+  allBookingsForChart: Booking[]; 
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -133,14 +131,30 @@ const toBuyRate = (docSnap: any): BuyRate => {
     weightCapacity: data.weightCapacity,
     minBooking: data.minBooking,
     rate: data.rate,
-    validFrom: data.validFrom, // Assuming stored as "yyyy-MM-dd" string
-    validTo: data.validTo,     // Assuming stored as "yyyy-MM-dd" string
+    validFrom: data.validFrom, 
+    validTo: data.validTo,     
   };
 };
 
+const toSchedule = (docSnap: any): Schedule => {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    carrier: data.carrier,
+    origin: data.origin, // Stored as Port Code
+    destination: data.destination, // Stored as Port Code
+    serviceRoute: data.serviceRoute,
+    allocation: data.allocation,
+    etd: data.etd, // Stored as ISO string
+    eta: data.eta, // Stored as ISO string
+    frequency: data.frequency,
+  };
+};
+
+
 async function getNextIdForCollection(collectionName: string, prefix: string): Promise<string> {
   const collRef = collection(db, collectionName);
-  const q = query(collRef, orderBy('__name__', 'desc'), limit(1)); // Efficiently get the last ID
+  const q = query(collRef, orderBy('__name__', 'desc'), limit(1)); 
   const snapshot = await getDocs(q);
   let maxNum = 0;
   if (!snapshot.empty) {
@@ -153,7 +167,6 @@ async function getNextIdForCollection(collectionName: string, prefix: string): P
       }
     }
   }
-  // If no documents or no matching prefix, and collectionName is one of our main ones, start from count.
   if (maxNum === 0 && ['quotations', 'bookings', 'buyRates', 'schedules'].includes(collectionName)) {
      const countSnapshot = await getCountFromServer(collection(db, collectionName));
      maxNum = countSnapshot.data().count;
@@ -164,15 +177,11 @@ async function getNextIdForCollection(collectionName: string, prefix: string): P
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [portsData, setPortsData] = useState<Port[]>(mockPorts);
-  // const [buyRatesDataState, setBuyRatesDataState] = useState<BuyRate[]>(initialMockBuyRates); // To be removed
-  const [schedulesDataState, setSchedulesDataState] = useState<Schedule[]>(initialMockSchedules); // To be removed
-  const [scheduleRatesDataState, setScheduleRatesDataState] = useState<ScheduleRate[]>(staticMockScheduleRates); // To be refactored
   const [appLoading, setAppLoading] = useState(true);
 
   const [allQuotationsForChart, setAllQuotationsForChart] = useState<Quotation[]>([]);
   const [allBookingsForChartData, setAllBookingsForChartData] = useState<Booking[]>([]);
   const [quotationStatusSummaryData, setQuotationStatusSummaryData] = useState<QuotationStatusSummary>({ draft: 0, submitted: 0, completed: 0, cancelled: 0 });
-  // const [bookingsByMonthData, setBookingsByMonthData] = useState<BookingsByMonthEntry[]>([]); // Managed by dashboard
 
   const seedDatabaseIfEmpty = useCallback(async () => {
     console.log("Checking if database needs seeding...");
@@ -183,7 +192,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Seed Quotations
     const quotationsRef = collection(db, "quotations");
     const quotationsSnapshot = await getDocs(query(quotationsRef, limit(1)));
-    const seededQuotationRefs: { [key: string]: string } = {}; // For booking foreign keys
+    const seededQuotationRefs: { [key: string]: string } = {}; 
 
     if (quotationsSnapshot.empty) {
       console.log("Quotations collection is empty. Seeding quotations...");
@@ -193,8 +202,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         quotationCounter++;
         const newQuotationId = `CQ-${quotationCounter}`;
         const profitAndLoss = (qData.sellRate || 0) - (qData.buyRate || 0);
+        const { id: sourceId, ...restOfQData } = qData; // Exclude 'id' if present in source
         const quotationToSave: any = {
-          ...qData,
+          ...restOfQData,
           buyRate: qData.buyRate === undefined ? null : qData.buyRate,
           sellRate: qData.sellRate === undefined ? null : qData.sellRate,
           profitAndLoss,
@@ -211,7 +221,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.log(`${quotationsToSeedFromImage.length} quotations prepared for seeding.`);
     } else {
       console.log("Quotations collection not empty, skipping quotation seed.");
-       // Populate seededQuotationRefs for bookings even if not seeding quotations, assuming IDs are CQ-1, CQ-2 etc.
       const existingQuotationsSnapshot = await getDocs(query(quotationsRef, orderBy('__name__')));
       existingQuotationsSnapshot.docs.forEach(docSnap => {
         const qData = toQuotation(docSnap);
@@ -220,7 +229,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    // Seed Bookings (after quotations)
+    // Seed Bookings
     const bookingsRef = collection(db, "bookings");
     const bookingsSnapshot = await getDocs(query(bookingsRef, limit(1)));
     if (bookingsSnapshot.empty) {
@@ -265,11 +274,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.log("BuyRates collection is empty. Seeding buy rates...");
         seededSomething = true;
         initialMockBuyRates.forEach((brDataSource, index) => {
-            const { id: brIdFromSource, ...restOfBrData } = brDataSource; // Destructure id out
+            const { id: brIdFromSource, ...restOfBrData } = brDataSource; 
             const buyRateId = brIdFromSource.startsWith("BR-IMG-") || brIdFromSource.startsWith("BR-LCL-") ? brIdFromSource : `BR-Seed-${index + 1}`;
             const buyRateDocRef = doc(db, "buyRates", buyRateId);
-            // Now, restOfBrData does not contain the 'id' field.
-            // Ensure validFrom and validTo are strings if they aren't already
             const dataToSet = {
               ...restOfBrData,
               validFrom: typeof restOfBrData.validFrom === 'string' ? restOfBrData.validFrom : format(restOfBrData.validFrom as unknown as Date, "yyyy-MM-dd"),
@@ -281,12 +288,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } else {
         console.log("BuyRates collection not empty, skipping buy rate seed.");
     }
+
+    // Seed Schedules
+    const schedulesRef = collection(db, "schedules");
+    const schedulesSnapshot = await getDocs(query(schedulesRef, limit(1)));
+    if (schedulesSnapshot.empty) {
+        console.log("Schedules collection is empty. Seeding schedules...");
+        seededSomething = true;
+        initialMockSchedules.forEach((schDataSource, index) => {
+            const { id: schIdFromSource, ...restOfSchData } = schDataSource;
+            const scheduleId = schIdFromSource.startsWith("SCH-IMG-") ? schIdFromSource : `SCH-Seed-${index + 1}`;
+            const scheduleDocRef = doc(db, "schedules", scheduleId);
+            // Ensure ETD and ETA are ISO strings (they should be from mockData)
+            const dataToSet = {
+              ...restOfSchData,
+              etd: restOfSchData.etd, // Should be ISO string
+              eta: restOfSchData.eta, // Should be ISO string
+            };
+            batch.set(scheduleDocRef, dataToSet);
+        });
+        console.log(`${initialMockSchedules.length} schedules prepared for seeding.`);
+    } else {
+        console.log("Schedules collection not empty, skipping schedule seed.");
+    }
     
     if (seededSomething) {
         await batch.commit();
         console.log("Database seeding committed.");
     } else {
-        console.log("No new seeding required for Quotations, Bookings, or BuyRates.");
+        console.log("No new seeding required for main collections.");
     }
 
   }, []);
@@ -337,9 +367,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let allQuotations: Quotation[];
 
     if (searchTerm) {
-      // Firestore doesn't support case-insensitive partial text search on multiple fields well.
-      // Fetch all and filter client-side for prototype simplicity.
-      // For production, consider a dedicated search service like Algolia/Typesense or more structured queries.
       const snapshot = await getDocs(query(qCollectionRef, orderBy("updatedAt", "desc")));
       allQuotations = snapshot.docs.map(toQuotation);
       const lowerSearchTerm = searchTerm.toLowerCase();
@@ -438,12 +465,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setAppLoading(false);
       return {
         ...currentData,
-        ...quotationData, // applies partial updates
-        id, // ensure id is present
-        buyRate: effectiveBuyRate, // ensure these are set
+        ...quotationData, 
+        id, 
+        buyRate: effectiveBuyRate, 
         sellRate: effectiveSellRate,
         profitAndLoss: dataToUpdate.profitAndLoss,
-        updatedAt: new Date().toISOString(), // reflect update time
+        updatedAt: new Date().toISOString(), 
       } as Quotation;
     } catch (error) {
       console.error("Error updating quotation:", error);
@@ -628,14 +655,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [loadInitialDataForCharts]);
 
 
-  // BuyRate Operations (Firestore)
+  // BuyRate Operations
   const fetchBuyRates = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
     const brCollectionRef = collection(db, "buyRates");
     let allBuyRates: BuyRate[];
 
-    // Similar to quotations, fetch all then filter client-side for prototype search simplicity
-    const snapshot = await getDocs(query(brCollectionRef, orderBy("validTo", "desc"))); // Order by something relevant
+    const snapshot = await getDocs(query(brCollectionRef, orderBy("validTo", "desc"))); 
     allBuyRates = snapshot.docs.map(toBuyRate);
 
     if (searchTerm) {
@@ -658,7 +684,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setAppLoading(true);
     try {
       const newId = await getNextIdForCollection("buyRates", "BR-");
-      // Ensure dates are strings "yyyy-MM-dd"
       const dataToSave = {
         ...data,
         validFrom: typeof data.validFrom === 'string' ? data.validFrom : format(data.validFrom as unknown as Date, "yyyy-MM-dd"),
@@ -678,7 +703,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setAppLoading(true);
     try {
       const docRef = doc(db, "buyRates", id);
-      // Ensure dates are strings "yyyy-MM-dd" if provided
       const dataToUpdate: any = { ...data };
       if (data.validFrom) {
         dataToUpdate.validFrom = typeof data.validFrom === 'string' ? data.validFrom : format(data.validFrom as unknown as Date, "yyyy-MM-dd");
@@ -710,66 +734,99 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Schedule Operations (mock for now, to be Firestore)
+  // Schedule Operations (Firestore)
   const fetchSchedules = useCallback(async (page: number, pageSize: number, searchTerm?: string) => {
     setAppLoading(true);
-    await simulateDelay(); // Keep simulation for mock data operations
-    let filteredData = [...schedulesDataState]; // Replace with Firestore fetch
-     if (searchTerm) {
+    const schCollectionRef = collection(db, "schedules");
+    let allSchedules: Schedule[];
+
+    const snapshot = await getDocs(query(schCollectionRef, orderBy("etd", "desc")));
+    allSchedules = snapshot.docs.map(toSchedule);
+
+    if (searchTerm) {
         const lowerSearchTerm = searchTerm.toLowerCase();
-        filteredData = filteredData.filter(s =>
+        allSchedules = allSchedules.filter(s =>
             s.carrier.toLowerCase().includes(lowerSearchTerm) ||
-            s.origin.toLowerCase().includes(lowerSearchTerm) ||
-            s.destination.toLowerCase().includes(lowerSearchTerm) ||
+            s.origin.toLowerCase().includes(lowerSearchTerm) || // origin is port code
+            s.destination.toLowerCase().includes(lowerSearchTerm) || // destination is port code
             s.serviceRoute.toLowerCase().includes(lowerSearchTerm) ||
-            s.frequency.toLowerCase().includes(lowerSearchTerm)
+            s.frequency.toLowerCase().includes(lowerSearchTerm) ||
+            portsData.find(p => p.code === s.origin)?.name.toLowerCase().includes(lowerSearchTerm) || // search by port name
+            portsData.find(p => p.code === s.destination)?.name.toLowerCase().includes(lowerSearchTerm) // search by port name
         );
     }
-    const sortedData = filteredData.sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime());
+    
+    const total = allSchedules.length;
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
     setAppLoading(false);
-    return { data: sortedData.slice(start, end), total: sortedData.length };
-  }, [schedulesDataState]);
+    return { data: allSchedules.slice(start, end), total };
+  }, [portsData]);
 
   const createSchedule = useCallback(async (data: Omit<Schedule, 'id'>) => {
     setAppLoading(true);
-    await simulateDelay();
-    const newSchedule: Schedule = { ...data, id: `SCH-${String(Date.now()).slice(-6)}` };
-    setSchedulesDataState(prev => [...prev, newSchedule].sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
-    setAppLoading(false);
-    return newSchedule;
+    try {
+      const newId = await getNextIdForCollection("schedules", "SCH-");
+      const dataToSave = {
+        ...data,
+        // Origin and Destination should be port codes. Ensure form passes these.
+        etd: typeof data.etd === 'string' ? data.etd : (data.etd as unknown as Date).toISOString(),
+        eta: typeof data.eta === 'string' ? data.eta : (data.eta as unknown as Date).toISOString(),
+      };
+      await setDoc(doc(db, "schedules", newId), dataToSave);
+      setAppLoading(false);
+      return { ...dataToSave, id: newId };
+    } catch (error) {
+      console.error("Error creating schedule:", error);
+      setAppLoading(false);
+      throw error;
+    }
   }, []);
 
   const updateSchedule = useCallback(async (id: string, data: Partial<Omit<Schedule, 'id'>>) => {
     setAppLoading(true);
-    await simulateDelay();
-    let updated: Schedule | undefined;
-    setSchedulesDataState(prev => prev.map(s => {
-      if (s.id === id) {
-        updated = { ...s, ...data };
-        return updated;
+    try {
+      const docRef = doc(db, "schedules", id);
+      const dataToUpdate: any = { ...data };
+      if (data.etd) {
+        dataToUpdate.etd = typeof data.etd === 'string' ? data.etd : (data.etd as unknown as Date).toISOString();
       }
-      return s;
-    }).sort((a,b) => parseISO(b.etd).getTime() - parseISO(a.etd).getTime()));
-    setAppLoading(false);
-    return updated;
+      if (data.eta) {
+        dataToUpdate.eta = typeof data.eta === 'string' ? data.eta : (data.eta as unknown as Date).toISOString();
+      }
+      await updateDoc(docRef, dataToUpdate);
+      setAppLoading(false);
+      const updatedDoc = await getDoc(docRef);
+      return updatedDoc.exists() ? toSchedule(updatedDoc) : undefined;
+    } catch (error) {
+      console.error("Error updating schedule:", error);
+      setAppLoading(false);
+      throw error;
+    }
   }, []);
 
   const deleteSchedule = useCallback(async (id: string) => {
     setAppLoading(true);
-    await simulateDelay();
-    setSchedulesDataState(prev => prev.filter(s => s.id !== id));
-    setAppLoading(false);
-    return true;
+    try {
+      await deleteDoc(doc(db, "schedules", id));
+      setAppLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error deleting schedule:", error);
+      setAppLoading(false);
+      throw error;
+    }
   }, []);
+
 
   const searchScheduleRates = useCallback(async (params: { pol?: string; pod?: string; equipment?: string }) => {
     setAppLoading(true);
     // This will need a significant refactor to use Firestore data for Schedules and BuyRates
-    await simulateDelay();
-    let results = [...scheduleRatesDataState]; // Current mock implementation
-
+    // For now, returning empty or static mock to avoid breaking UI too much during transition.
+    // TODO: Implement Firestore-backed searchScheduleRates in the next step.
+    
+    // Placeholder for mock staticMockScheduleRates, filtering slightly
+    let results = [...staticMockScheduleRates]; 
     const polPort = params.pol ? portsData.find(p => p.name.toLowerCase() === params.pol!.toLowerCase()) : undefined;
     const podPort = params.pod ? portsData.find(p => p.name.toLowerCase() === params.pod!.toLowerCase()) : undefined;
 
@@ -786,7 +843,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     setAppLoading(false);
     return results.slice(0, 10);
-  }, [portsData, scheduleRatesDataState]);
+  }, [portsData, staticMockScheduleRates]);
 
 
   return (
@@ -794,7 +851,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ports: portsData,
       loading: appLoading,
       quotationStatusSummary: quotationStatusSummaryData,
-      // bookingsByMonth: bookingsByMonthData,
       allBookingsForChart: allBookingsForChartData,
       fetchQuotations, getQuotationById, createQuotation, updateQuotation, deleteQuotation,
       fetchBookings, getBookingById, createBooking, updateBooking, deleteBooking,

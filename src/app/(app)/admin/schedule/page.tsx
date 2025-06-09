@@ -27,7 +27,7 @@ import { format, parseISO } from 'date-fns';
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 export default function ManageSchedulesPage() {
-  const { fetchSchedules, createSchedule, updateSchedule, deleteSchedule, loading } = useData();
+  const { fetchSchedules, createSchedule, updateSchedule, deleteSchedule, loading, ports } = useData();
   const { toast } = useToast();
 
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
@@ -86,17 +86,13 @@ export default function ManageSchedulesPage() {
   };
 
   const handleFormSubmit = async (data: ScheduleFormValues) => {
-    const formattedData = {
-        ...data,
-        etd: data.etd.toISOString(),
-        eta: data.eta.toISOString(),
-    };
-
+    // DataContext's createSchedule/updateSchedule now expect ScheduleFormValues
+    // and will handle date to ISO string conversion internally if needed.
     if (editingSchedule) {
-      await updateSchedule(editingSchedule.id, formattedData);
+      await updateSchedule(editingSchedule.id, data as Partial<Omit<Schedule, 'id'>>);
       toast({ title: "Success", description: "Schedule updated successfully." });
     } else {
-      await createSchedule(formattedData);
+      await createSchedule(data as Omit<Schedule, 'id'>);
       toast({ title: "Success", description: "Schedule created successfully." });
     }
     loadData(currentPage, debouncedSearchTerm);
@@ -105,6 +101,12 @@ export default function ManageSchedulesPage() {
   };
 
   const columns = React.useMemo(() => getScheduleColumns(), []);
+
+  const getPortName = (code: string | undefined) => {
+    if (!code) return 'N/A';
+    const port = ports.find(p => p.code === code);
+    return port ? port.name : code;
+  }
 
   return (
     <div className="space-y-6">
@@ -163,7 +165,7 @@ export default function ManageSchedulesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the schedule for carrier <strong>{itemToDelete?.carrier}</strong> on route <strong>{itemToDelete?.serviceRoute}</strong>.
+              This action cannot be undone. This will permanently delete the schedule for carrier <strong>{itemToDelete?.carrier}</strong> from <strong>{getPortName(itemToDelete?.origin)}</strong> to <strong>{getPortName(itemToDelete?.destination)}</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
