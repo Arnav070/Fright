@@ -11,7 +11,7 @@ import { getBuyRateColumns } from './columns';
 import { BuyRateForm, type BuyRateFormValues } from '@/components/admin/BuyRateForm';
 import { PlusCircle, Edit, Trash2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useDebounce } from '../../../../hooks/useDebounce';
 import {
   AlertDialog,
   AlertDialogAction,
